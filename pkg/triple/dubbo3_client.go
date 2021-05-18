@@ -90,28 +90,38 @@ func (t *TripleClient) connect(opt *config.Option) error {
 }
 
 // Invoke call remote using stub
-func (t *TripleClient) Invoke(methodName string, in []reflect.Value) []reflect.Value {
-	rsp := make([]reflect.Value, 0, 2)
+func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply interface{}) error {
 	switch t.opt.SerializerType {
 	case constant.PBSerializerName:
 		method := t.StubInvoker.MethodByName(methodName)
 		// call function in pb.go
-		return method.Call(in)
+		res := method.Call(in)
+		if res[1].IsValid() && res[1].Interface() != nil {
+			return res[1].Interface().(error)
+		}
+		_ = tools.ReflectResponse(res[0], reply)
 	case constant.TripleHessianWrapperSerializerName:
+		// todo: fix hessian as msgPack without usage of HessianUnmarshalStruct
 		out := codec.HessianUnmarshalStruct{}
 		ctx := in[0].Interface().(context.Context)
 		interfaceKey := ctx.Value(constant.InterfaceKey).(string)
 		err := t.Request(ctx, "/"+interfaceKey+"/"+methodName, in[1].Interface(), &out)
-		rsp = append(rsp, reflect.ValueOf(out.Val))
 		if err != nil {
-			return append(rsp, reflect.ValueOf(err))
+			return err
 		}
-		return append(rsp, reflect.Value{})
+		_ = tools.ReflectResponse(out.Val, reply)
+	case constant.MsgPackSerializerName:
+		ctx := in[0].Interface().(context.Context)
+		interfaceKey := ctx.Value(constant.InterfaceKey).(string)
+		err := t.Request(ctx, "/"+interfaceKey+"/"+methodName, in[1].Interface(), reply)
+		if err != nil {
+			return err
+		}
 	default:
 		t.opt.Logger.Errorf("Invalid triple client serializerType = %s", t.opt.SerializerType)
-		rsp = append(rsp, reflect.Value{})
-		return append(rsp, reflect.ValueOf(perrors.Errorf("Invalid triple client serializerType = %s", t.opt.SerializerType)))
+		return perrors.Errorf("Invalid triple client serializerType = %s", t.opt.SerializerType)
 	}
+	return nil
 }
 
 // Request call h2Controller to send unary rpc req to server

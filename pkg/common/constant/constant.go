@@ -45,6 +45,9 @@ const (
 
 	// TripleHessianWrapperSerializerName is the serializer with pb wrapped with hessian2
 	TripleHessianWrapperSerializerName = TripleSerializerName("triple-hessian-wrapper")
+
+	// MsgPackSerializerName is the serializer with pb wrapped with msgpack
+	MsgPackSerializerName = TripleSerializerName("msgpack")
 )
 
 // context key

@@ -26,12 +26,14 @@ import (
 	proto2 "github.com/dubbogo/triple/internal/codec/proto"
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 func init() {
 	common.SetDubbo3Serializer(constant.PBSerializerName, NewProtobufCodeC)
 	common.SetDubbo3Serializer(constant.HessianSerializerName, NewHessianCodeC)
 	common.SetDubbo3Serializer(constant.TripleHessianWrapperSerializerName, NewTripleHessianWrapperSerializer)
+	common.SetDubbo3Serializer(constant.MsgPackSerializerName, NewMsgPackSerializer)
 }
 
 // ProtobufCodeC is the protobuf impl of Dubbo3Serializer interface
@@ -191,4 +193,36 @@ func (h *TripleHessianWrapperSerializer) UnmarshalResponse(data []byte, v interf
 		return err
 	}
 	return h.hessianSerializer.UnmarshalResponse(wrapperResponse.Data, v)
+}
+
+// MsgPackSerializer is the msgpack impl of Dubbo3Serializer interface
+type MsgPackSerializer struct{}
+
+// MarshalRequest serialize interface @v to bytes
+func (p *MsgPackSerializer) MarshalRequest(v interface{}) ([]byte, error) {
+	return msgpack.Marshal(v)
+}
+
+// UnmarshalRequest deserialize @data to interface
+func (p *MsgPackSerializer) UnmarshalRequest(data []byte, v interface{}) error {
+	//var val interface{}
+	if err := msgpack.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalResponse serialize interface @v to bytes
+func (p *MsgPackSerializer) MarshalResponse(v interface{}) ([]byte, error) {
+	return p.MarshalRequest(v)
+}
+
+// UnmarshalResponse deserialize @data to interface
+func (p *MsgPackSerializer) UnmarshalResponse(data []byte, v interface{}) error {
+	return p.UnmarshalRequest(data, v)
+}
+
+// NewMsgPackSerializer returns new ProtobufCodeC
+func NewMsgPackSerializer() common.Dubbo3Serializer {
+	return &MsgPackSerializer{}
 }

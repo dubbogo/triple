@@ -31,6 +31,7 @@ type Dubbo3GrpcService interface {
 }
 
 // nolint
-type Dubbo3HessianService interface {
+type Dubbo3UnaryService interface {
 	InvokeWithArgs(ctx context.Context, methodName string, arguments []interface{}) (interface{}, error)
+	GetReqParamsInteface(methodName string) (interface{}, bool)
 }

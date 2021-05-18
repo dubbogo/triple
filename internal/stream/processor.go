@@ -20,6 +20,7 @@ package stream
 import (
 	"bytes"
 	"errors"
+	"reflect"
 	"sync"
 )
 
@@ -108,15 +109,18 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 
 	var reply interface{}
 	var err error
+
+	_, methodName, e := tools.GetServiceKeyAndUpperCaseMethodNameFromPath(header.GetPath())
+	if e != nil {
+		return nil, e
+	}
+	// p.opt.SerializerType must be one of supported three
 	if p.opt.SerializerType == constant.TripleHessianWrapperSerializerName {
-		dubbo3HessianService, ok := service.(common.Dubbo3HessianService)
+		dubbo3HessianService, ok := service.(common.Dubbo3UnaryService)
 		if !ok {
-			return nil, status.Errorf(codes.Internal, "hessian provider service doesn't impl Dubbo3HessianService")
+			return nil, status.Errorf(codes.Internal, "hessian provider service doesn't impl Dubbo3UnaryService")
 		}
-		_, methodName, e := tools.GetServiceKeyAndUpperCaseMethodNameFromPath(header.GetPath())
-		if e != nil {
-			return nil, e
-		}
+
 		var v codec.HessianUnmarshalStruct
 		if err = p.serializer.UnmarshalRequest(pkgData, &v); err != nil {
 			return nil, status.Errorf(codes.Internal, "Unary rpc request unmarshal error: %s", err)
@@ -131,6 +135,29 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 			return nil
 		}
 		reply, err = p.methodDesc.Handler(service, header.FieldToCtx(), descFunc, nil)
+	} else if p.opt.SerializerType == constant.MsgPackSerializerName {
+		dubbo3HessianService, ok := service.(common.Dubbo3UnaryService)
+		if !ok {
+			return nil, status.Errorf(codes.Internal, "msgpack provider service doesn't impl Dubbo3UnaryService")
+		}
+		reqParam, ok := dubbo3HessianService.GetReqParamsInteface(methodName)
+		if !ok {
+			return nil, status.Errorf(codes.Internal, "provider unmarshal error: no req param data")
+		}
+		if !ok {
+			return nil, status.Errorf(codes.Internal, "msgpack provider service doesn't impl Dubbo3UnaryService")
+		}
+		_, methodName, e := tools.GetServiceKeyAndUpperCaseMethodNameFromPath(header.GetPath())
+		if e != nil {
+			return nil, e
+		}
+		if err = p.serializer.UnmarshalRequest(pkgData, reqParam); err != nil {
+			return nil, status.Errorf(codes.Internal, "Unary rpc request unmarshal error: %s", err)
+		}
+		args := make([]interface{}, 0, 1)
+		reqParam = reflect.ValueOf(reqParam).Elem().Interface()
+		args = append(args, reqParam)
+		reply, err = dubbo3HessianService.InvokeWithArgs(header.FieldToCtx(), methodName, args)
 	}
 
 	if err != nil {

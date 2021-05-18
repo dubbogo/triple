@@ -163,7 +163,7 @@ func (ss *serverStream) Close() {
 }
 
 // nolint
-func NewUnaryServerStreamWithOutDesc(header h2Triple.ProtocolHeader, opt *config.Option, service common.Dubbo3HessianService, serializer common.Dubbo3Serializer, option *config.Option) (*serverStream, error) {
+func NewUnaryServerStreamWithOutDesc(header h2Triple.ProtocolHeader, opt *config.Option, service common.Dubbo3UnaryService, serializer common.Dubbo3Serializer, option *config.Option) (*serverStream, error) {
 	baseStream := newBaseStream(service)
 
 	serverStream := &serverStream{

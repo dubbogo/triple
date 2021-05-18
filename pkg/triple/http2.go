@@ -313,10 +313,10 @@ func (hc *H2Controller) newServerStreamFromTripleHedaer(data h2Triple.ProtocolHe
 
 	// creat server stream
 	switch hc.option.SerializerType {
-	case constant.TripleHessianWrapperSerializerName:
-		service, ok := serviceInterface.(common.Dubbo3HessianService)
+	case constant.TripleHessianWrapperSerializerName, constant.MsgPackSerializerName:
+		service, ok := serviceInterface.(common.Dubbo3UnaryService)
 		if !ok {
-			return nil, status.Err(codes.Internal, "can't assert impl of interface "+interfaceKey+" to Dubbo3HessianService")
+			return nil, status.Err(codes.Internal, "can't assert impl of interface "+interfaceKey+" to Dubbo3UnaryService")
 		}
 		// hessian serializer doesn't need to use grpc.Desc, and now only support unary invocation
 		var err error
