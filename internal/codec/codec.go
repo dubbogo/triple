@@ -20,13 +20,13 @@ package codec
 import (
 	hessian "github.com/apache/dubbo-go-hessian2"
 	"github.com/golang/protobuf/proto"
+	mp "github.com/ugorji/go/codec"
 )
 
 import (
 	proto2 "github.com/dubbogo/triple/internal/codec/proto"
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
-	"github.com/vmihailenco/msgpack/v5"
 )
 
 func init() {
@@ -200,16 +200,16 @@ type MsgPackSerializer struct{}
 
 // MarshalRequest serialize interface @v to bytes
 func (p *MsgPackSerializer) MarshalRequest(v interface{}) ([]byte, error) {
-	return msgpack.Marshal(v)
+	var out []byte
+	encoder := mp.NewEncoderBytes(&out, new(mp.MsgpackHandle))
+	err := encoder.Encode(v)
+	return out, err
 }
 
 // UnmarshalRequest deserialize @data to interface
 func (p *MsgPackSerializer) UnmarshalRequest(data []byte, v interface{}) error {
-	//var val interface{}
-	if err := msgpack.Unmarshal(data, &v); err != nil {
-		return err
-	}
-	return nil
+	dec := mp.NewDecoderBytes(data, new(mp.MsgpackHandle))
+	return dec.Decode(v)
 }
 
 // MarshalResponse serialize interface @v to bytes

@@ -306,7 +306,7 @@ func (hc *H2Controller) newServerStreamFromTripleHedaer(data h2Triple.ProtocolHe
 
 	serviceInterface, ok := hc.rpcServiceMap.Load(interfaceKey)
 	if !ok {
-		return nil, status.Err(codes.Unimplemented, "not found target service key"+interfaceKey)
+		return nil, status.Err(codes.Unimplemented, "not found target service key "+interfaceKey)
 	}
 
 	var newstm stream.Stream
