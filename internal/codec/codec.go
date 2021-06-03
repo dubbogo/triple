@@ -20,6 +20,7 @@ package codec
 import (
 	hessian "github.com/apache/dubbo-go-hessian2"
 	"github.com/golang/protobuf/proto"
+	perrors "github.com/pkg/errors"
 	mp "github.com/ugorji/go/codec"
 )
 
@@ -33,7 +34,7 @@ func init() {
 	common.SetDubbo3Serializer(constant.PBSerializerName, NewProtobufCodeC)
 	common.SetDubbo3Serializer(constant.HessianSerializerName, NewHessianCodeC)
 	common.SetDubbo3Serializer(constant.TripleHessianWrapperSerializerName, NewTripleHessianWrapperSerializer)
-	common.SetDubbo3Serializer(constant.MsgPackSerializerName, NewMsgPackSerializer)
+	common.SetDubbo3Serializer(constant.MsgPackSerializerName, NewTripleMsgPackWrapperSerializer)
 }
 
 // ProtobufCodeC is the protobuf impl of Dubbo3Serializer interface
@@ -225,4 +226,78 @@ func (p *MsgPackSerializer) UnmarshalResponse(data []byte, v interface{}) error 
 // NewMsgPackSerializer returns new ProtobufCodeC
 func NewMsgPackSerializer() common.Dubbo3Serializer {
 	return &MsgPackSerializer{}
+}
+
+// TripleHessianWrapperSerializer
+type TripleMsgPackWrapperSerializer struct {
+	pbSerializer      common.Dubbo3Serializer
+	msgPackSerializer common.Dubbo3Serializer
+}
+
+// nolint
+func NewTripleMsgPackWrapperSerializer() common.Dubbo3Serializer {
+	return &TripleMsgPackWrapperSerializer{
+		pbSerializer:      NewProtobufCodeC(),
+		msgPackSerializer: NewMsgPackSerializer(),
+	}
+}
+
+// nolint
+func (h *TripleMsgPackWrapperSerializer) MarshalRequest(v interface{}) ([]byte, error) {
+	argsBytes := make([][]byte, 0)
+	argsTypes := make([]string, 0)
+	data, err := h.msgPackSerializer.MarshalRequest(v)
+	if err != nil {
+		return nil, err
+	}
+	argsBytes = append(argsBytes, data)
+	argsTypes = append(argsTypes, getArgType(v))
+
+	wrapperRequest := &proto2.TripleRequestWrapper{
+		SerializeType: string(constant.HessianSerializerName),
+		Args:          argsBytes,
+		// todo to java name
+		ArgTypes: argsTypes,
+	}
+	return h.pbSerializer.MarshalRequest(wrapperRequest)
+}
+
+// nolint
+func (h *TripleMsgPackWrapperSerializer) UnmarshalRequest(data []byte, v interface{}) error {
+	wrapperRequest := proto2.TripleRequestWrapper{}
+	err := h.pbSerializer.UnmarshalRequest(data, &wrapperRequest)
+	if err != nil {
+		return err
+	}
+	if len(wrapperRequest.Args) != 1 {
+		return perrors.New("wrapper request args len is not 1")
+	}
+	if err := h.msgPackSerializer.UnmarshalRequest(wrapperRequest.Args[0], v); err != nil {
+		return err
+	}
+	return nil
+}
+
+// nolint
+func (h *TripleMsgPackWrapperSerializer) MarshalResponse(v interface{}) ([]byte, error) {
+	data, err := h.msgPackSerializer.MarshalResponse(v)
+	if err != nil {
+		return nil, err
+	}
+	wrapperRequest := &proto2.TripleResponseWrapper{
+		SerializeType: string(constant.MsgPackSerializerName),
+		Data:          data,
+		Type:          getArgType(v),
+	}
+	return h.pbSerializer.MarshalResponse(wrapperRequest)
+}
+
+// nolint
+func (h *TripleMsgPackWrapperSerializer) UnmarshalResponse(data []byte, v interface{}) error {
+	wrapperResponse := proto2.TripleResponseWrapper{}
+	err := h.pbSerializer.UnmarshalResponse(data, &wrapperResponse)
+	if err != nil {
+		return err
+	}
+	return h.msgPackSerializer.UnmarshalResponse(wrapperResponse.Data, v)
 }
