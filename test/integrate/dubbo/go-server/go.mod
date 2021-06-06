@@ -3,8 +3,7 @@ module github.com/dubbogo/triple/test/integrate/dubbo/go-server
 go 1.13
 
 require (
-	github.com/apache/dubbo-go v1.5.6-rc2.0.20210423025830-279ccd2e567c
-	github.com/dubbogo/gost v1.11.7 // indirect
+	dubbo.apache.org/dubbo-go/v3 v3.0.0-rc1
 	github.com/dubbogo/triple v1.0.0
 	github.com/golang/protobuf v1.5.2
 	github.com/pelletier/go-toml v1.4.0 // indirect
