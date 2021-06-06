@@ -33,21 +33,18 @@ const (
 )
 
 // serializer
-// TripleSerializerName is the type of triple serializer
-type TripleSerializerName string
+// CodecType is the type of triple serializer
+type CodecType string
 
 const (
-	// PBSerializerName is the default serializer name, triple use pb as serializer.
-	PBSerializerName = TripleSerializerName("protobuf")
+	// PBCodecName is the default serializer name, triple use pb as serializer.
+	PBCodecName = CodecType("protobuf")
 
-	// HessianSerializerName is the serializer with pb wrapped with hessian2
-	HessianSerializerName = TripleSerializerName("hessian2")
+	// HessianCodecName is the serializer with pb wrapped with hessian2
+	HessianCodecName = CodecType("hessian2")
 
-	// TripleHessianWrapperSerializerName is the serializer with pb wrapped with hessian2
-	TripleHessianWrapperSerializerName = TripleSerializerName("triple-hessian-wrapper")
-
-	// MsgPackSerializerName is the serializer with pb wrapped with msgpack
-	MsgPackSerializerName = TripleSerializerName("msgpack")
+	// MsgPackCodecName is the serializer with pb wrapped with msgpack
+	MsgPackCodecName = CodecType("msgpack")
 )
 
 // context key

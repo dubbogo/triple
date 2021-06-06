@@ -25,13 +25,13 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Dubbo3GrpcService is gRPC service, used to check impl
-type Dubbo3GrpcService interface {
+// TripleGrpcService is gRPC service, used to check impl
+type TripleGrpcService interface {
 	ServiceDesc() *grpc.ServiceDesc
 }
 
 // nolint
-type Dubbo3UnaryService interface {
+type TripleUnaryService interface {
 	InvokeWithArgs(ctx context.Context, methodName string, arguments []interface{}) (interface{}, error)
 	GetReqParamsInteface(methodName string) (interface{}, bool)
 }

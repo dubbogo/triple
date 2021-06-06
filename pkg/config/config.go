@@ -19,7 +19,7 @@ package config
 
 import (
 	"github.com/dubbogo/triple/pkg/common/constant"
-	"github.com/dubbogo/triple/pkg/common/logger"
+	loggerInteface "github.com/dubbogo/triple/pkg/common/logger"
 	"github.com/dubbogo/triple/pkg/common/logger/default_logger"
 )
 
@@ -30,16 +30,18 @@ type Option struct {
 	BufferSize uint32
 
 	// service opts
-	Location       string
-	Protocol       string
-	SerializerType constant.TripleSerializerName
+	Location  string
+	Protocol  string
+	CodecType constant.CodecType
+	//SerializerTypeInWrapper  is used in pbWrapperCodec, to write serializeType field, if empty, use Option.CodecType as default
+	SerializerTypeInWrapper string
 
 	// triple header opts
 	HeaderGroup      string
 	HeaderAppVersion string
 
 	// logger
-	Logger logger.Logger
+	Logger loggerInteface.Logger
 }
 
 // Validate sets empty field to default config
@@ -64,8 +66,8 @@ func (o *Option) Validate() {
 		o.Protocol = constant.TRIPLE
 	}
 
-	if o.SerializerType == "" {
-		o.SerializerType = constant.PBSerializerName
+	if o.CodecType == "" {
+		o.CodecType = constant.PBCodecName
 	}
 }
 
@@ -96,10 +98,10 @@ func WithBufferSize(size uint32) OptionFunction {
 	}
 }
 
-// WithSerializerType return OptionFunction with target @serializerType, now we support "protobuf" and "hessian2"
-func WithSerializerType(serializerType constant.TripleSerializerName) OptionFunction {
+// WithCodecType return OptionFunction with target @serializerType, now we support "protobuf" and "hessian2"
+func WithCodecType(serializerType constant.CodecType) OptionFunction {
 	return func(o *Option) {
-		o.SerializerType = serializerType
+		o.CodecType = serializerType
 	}
 }
 
@@ -132,8 +134,16 @@ func WithHeaderGroup(group string) OptionFunction {
 }
 
 // WithLogger return OptionFunction with target @logger, which must impl triple/pkg/common/logger.Logger
-func WithLogger(logger logger.Logger) OptionFunction {
+// the input @logger should be AddCallerSkip(1)
+func WithLogger(logger loggerInteface.Logger) OptionFunction {
 	return func(o *Option) {
-		o.Logger = logger
+		o.Logger = loggerInteface.NewLoggerWrapper(logger)
+	}
+}
+
+// WithSerializerTypeInWrapper return OptionFunction with target @name as SerializerTypeInWrapper
+func WithSerializerTypeInWrapper(name string) OptionFunction {
+	return func(o *Option) {
+		o.SerializerTypeInWrapper = name
 	}
 }

@@ -104,22 +104,6 @@ func TestSetAndGetGetPackagerHandler(t *testing.T) {
 type TestDubbo3Serializer struct {
 }
 
-func (p *TestDubbo3Serializer) MarshalRequest(i interface{}) ([]byte, error) {
-	panic("implement me")
-}
-
-func (p *TestDubbo3Serializer) UnmarshalRequest(data []byte, v interface{}) error {
-	panic("implement me")
-}
-
-func (p *TestDubbo3Serializer) MarshalResponse(i interface{}) ([]byte, error) {
-	panic("implement me")
-}
-
-func (p *TestDubbo3Serializer) UnmarshalResponse(data []byte, v interface{}) error {
-	panic("implement me")
-}
-
 func (p *TestDubbo3Serializer) Marshal(v interface{}) ([]byte, error) {
 	return []byte{}, nil
 }
@@ -127,16 +111,16 @@ func (p *TestDubbo3Serializer) Unmarshal(data []byte, v interface{}) error {
 	return nil
 }
 
-func newTestDubbo3Serializer() Dubbo3Serializer {
+func newTestDubbo3Serializer() Codec {
 	return &TestDubbo3Serializer{}
 }
 
 func TestGetAndSetSerilizer(t *testing.T) {
 	oriSerializer := newTestDubbo3Serializer()
-	SetDubbo3Serializer("test-protocol", newTestDubbo3Serializer)
-	opt := config.NewTripleOption(config.WithSerializerType("test-protocol"))
+	SetTripleCodec("test-protocol", newTestDubbo3Serializer)
+	opt := config.NewTripleOption(config.WithCodecType("test-protocol"))
 	opt.Validate()
-	ser, err := GetDubbo3Serializer(opt)
+	ser, err := GetTripleCodec(opt.CodecType)
 	assert.Equal(t, err, nil)
 	assert.Equal(t, reflect.TypeOf(ser), reflect.TypeOf(oriSerializer))
 }

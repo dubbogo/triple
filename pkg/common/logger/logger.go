@@ -29,3 +29,41 @@ type Logger interface {
 	Errorf(fmt string, args ...interface{})
 	Debugf(fmt string, args ...interface{})
 }
+
+// LoggerWrapper is used to wrap raw logger to match AddCallerSkip(1) of logger layer skip
+type LoggerWrapper struct {
+	logger Logger
+}
+
+// NewLoggerWrapper
+func NewLoggerWrapper(logger Logger) *LoggerWrapper {
+	return &LoggerWrapper{
+		logger: logger,
+	}
+}
+
+func (w *LoggerWrapper) Info(args ...interface{}) {
+	w.logger.Info(args)
+}
+func (w *LoggerWrapper) Warn(args ...interface{}) {
+	w.logger.Warn(args)
+}
+func (w *LoggerWrapper) Error(args ...interface{}) {
+	w.logger.Error(args)
+}
+func (w *LoggerWrapper) Debug(args ...interface{}) {
+	w.logger.Debug(args)
+}
+
+func (w *LoggerWrapper) Infof(fmt string, args ...interface{}) {
+	w.logger.Infof(fmt, args)
+}
+func (w *LoggerWrapper) Warnf(fmt string, args ...interface{}) {
+	w.logger.Warnf(fmt, args)
+}
+func (w *LoggerWrapper) Errorf(fmt string, args ...interface{}) {
+	w.logger.Errorf(fmt, args)
+}
+func (w *LoggerWrapper) Debugf(fmt string, args ...interface{}) {
+	w.logger.Debugf(fmt, args)
+}

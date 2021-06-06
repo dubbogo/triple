@@ -26,8 +26,8 @@ import (
 	hessian "github.com/apache/dubbo-go-hessian2"
 )
 
-// getArgType is copied from hessian, to get java class type of interface
-func getArgType(v interface{}) string {
+// GetArgType is copied from hessian, to get java class type of interface
+func GetArgType(v interface{}) string {
 	if v == nil {
 		return "V"
 	}

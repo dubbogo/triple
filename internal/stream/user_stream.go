@@ -34,10 +34,10 @@ import (
 
 // baseUserStream is the base userstream impl
 type baseUserStream struct {
-	opt        *config.Option
-	stream     Stream
-	serilizer  common.Dubbo3Serializer
-	pkgHandler common.PackageHandler
+	opt         *config.Option
+	stream      Stream
+	twoWayCodec common.TwoWayCodec
+	pkgHandler  common.PackageHandler
 }
 
 // nolint
@@ -61,7 +61,7 @@ func (ss *baseUserStream) Context() context.Context {
 
 // nolint
 func (ss *baseUserStream) SendMsg(m interface{}) error {
-	replyData, err := ss.serilizer.MarshalRequest(m)
+	replyData, err := ss.twoWayCodec.MarshalRequest(m)
 	if err != nil {
 		ss.opt.Logger.Error("sen msg error with msg = ", m)
 		return err
@@ -79,7 +79,7 @@ func (ss *baseUserStream) RecvMsg(m interface{}) error {
 		return errors.Errorf("user stream closed!")
 	}
 	pkgData, _ := ss.pkgHandler.Frame2PkgData(readBuf.Bytes())
-	if err := ss.serilizer.UnmarshalResponse(pkgData, m); err != nil {
+	if err := ss.twoWayCodec.UnmarshalResponse(pkgData, m); err != nil {
 		return err
 	}
 	return nil
@@ -90,13 +90,13 @@ type serverUserStream struct {
 	baseUserStream
 }
 
-func newServerUserStream(s Stream, serilizer common.Dubbo3Serializer, pkgHandler common.PackageHandler, opt *config.Option) *serverUserStream {
+func newServerUserStream(s Stream, serilizer common.TwoWayCodec, pkgHandler common.PackageHandler, opt *config.Option) *serverUserStream {
 	return &serverUserStream{
 		baseUserStream: baseUserStream{
-			serilizer:  serilizer,
-			pkgHandler: pkgHandler,
-			stream:     s,
-			opt:        opt,
+			twoWayCodec: serilizer,
+			pkgHandler:  pkgHandler,
+			stream:      s,
+			opt:         opt,
 		},
 	}
 }
@@ -123,13 +123,13 @@ func (ss *clientUserStream) CloseSend() error {
 }
 
 // nolint
-func NewClientUserStream(s Stream, serilizer common.Dubbo3Serializer, pkgHandler common.PackageHandler, opt *config.Option) *clientUserStream {
+func NewClientUserStream(s Stream, serilizer common.TwoWayCodec, pkgHandler common.PackageHandler, opt *config.Option) *clientUserStream {
 	return &clientUserStream{
 		baseUserStream: baseUserStream{
-			serilizer:  serilizer,
-			pkgHandler: pkgHandler,
-			stream:     s,
-			opt:        opt,
+			twoWayCodec: serilizer,
+			pkgHandler:  pkgHandler,
+			stream:      s,
+			opt:         opt,
 		},
 	}
 }

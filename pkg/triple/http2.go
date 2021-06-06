@@ -39,6 +39,7 @@ import (
 )
 
 import (
+	codecImpl "github.com/dubbogo/triple/internal/codec/twoway_codec_impl"
 	"github.com/dubbogo/triple/internal/codes"
 	"github.com/dubbogo/triple/internal/message"
 	"github.com/dubbogo/triple/internal/status"
@@ -68,7 +69,7 @@ type H2Controller struct {
 	// option is 10M by default
 	option *config.Option
 
-	serializer common.Dubbo3Serializer
+	twowayCodec common.TwoWayCodec
 }
 
 // skipHeader is to skip first 5 byte from dataframe with header
@@ -240,7 +241,7 @@ func (hc *H2Controller) GetHandler() func(w http.ResponseWriter, r *http.Request
 }
 
 // getMethodAndStreamDescMap get unary method desc map and stream method desc map from dubbo3 stub
-func getMethodAndStreamDescMap(ds common.Dubbo3GrpcService) (map[string]grpc.MethodDesc, map[string]grpc.StreamDesc, error) {
+func getMethodAndStreamDescMap(ds common.TripleGrpcService) (map[string]grpc.MethodDesc, map[string]grpc.StreamDesc, error) {
 	sdMap := make(map[string]grpc.MethodDesc, 8)
 	strMap := make(map[string]grpc.StreamDesc, 8)
 	for _, v := range ds.ServiceDesc().Methods {
@@ -259,9 +260,9 @@ func NewH2Controller(isServer bool, rpcServiceMap *sync.Map, opt *config.Option)
 
 	pkgHandler, _ = common.GetPackagerHandler(opt)
 
-	serilizer, err := common.GetDubbo3Serializer(opt)
+	codec, err := codecImpl.NewTwoWayCodec(opt.CodecType)
 	if err != nil {
-		opt.Logger.Errorf("find serilizer named %s error = %v", opt.SerializerType, err)
+		opt.Logger.Errorf("find serilizer named %s error = %v", opt.CodecType, err)
 		return nil, err
 	}
 
@@ -283,7 +284,7 @@ func NewH2Controller(isServer bool, rpcServiceMap *sync.Map, opt *config.Option)
 		pkgHandler:    pkgHandler,
 		option:        opt,
 		closeChan:     make(chan struct{}),
-		serializer:    serilizer,
+		twowayCodec:   codec,
 	}
 	return h2c, nil
 }
@@ -312,25 +313,12 @@ func (hc *H2Controller) newServerStreamFromTripleHedaer(data h2Triple.ProtocolHe
 	var newstm stream.Stream
 
 	// creat server stream
-	switch hc.option.SerializerType {
-	case constant.TripleHessianWrapperSerializerName, constant.MsgPackSerializerName:
-		service, ok := serviceInterface.(common.Dubbo3UnaryService)
+	if hc.option.CodecType == constant.PBCodecName {
+		service, ok := serviceInterface.(common.TripleGrpcService)
 		if !ok {
-			return nil, status.Err(codes.Internal, "can't assert impl of interface "+interfaceKey+" to Dubbo3UnaryService")
+			return nil, status.Err(codes.Internal, "can't assert impl of interface "+interfaceKey+" to TripleGrpcService")
 		}
-		// hessian serializer doesn't need to use grpc.Desc, and now only support unary invocation
-		var err error
-		newstm, err = stream.NewUnaryServerStreamWithOutDesc(data, hc.option, service, hc.serializer, hc.option)
-		if err != nil {
-			hc.option.Logger.Errorf("hessian server new server stream error = %v", err)
-			return nil, err
-		}
-	case constant.PBSerializerName:
-		service, ok := serviceInterface.(common.Dubbo3GrpcService)
-		if !ok {
-			return nil, status.Err(codes.Internal, "can't assert impl of interface "+interfaceKey+" to Dubbo3GrpcService")
-		}
-		// pb serializer needs grpc.Desc to do method discovery, allowing unary and streaming invocation
+		// pb twowayCodec needs grpc.Desc to do method discovery, allowing unary and streaming invocation
 		mdMap, strMap, err := getMethodAndStreamDescMap(service)
 		if err != nil {
 			hc.option.Logger.Error("new H2 controller error:", err)
@@ -344,21 +332,30 @@ func (hc *H2Controller) newServerStreamFromTripleHedaer(data h2Triple.ProtocolHe
 		}
 
 		if okm {
-			newstm, err = stream.NewServerStream(data, unaryRPCDiscovery, hc.option, service, hc.serializer)
+			newstm, err = stream.NewServerStream(data, unaryRPCDiscovery, hc.option, service, hc.twowayCodec)
 			if err != nil {
 				hc.option.Logger.Error("newServerStream error", err)
 				return nil, err
 			}
 		} else {
-			newstm, err = stream.NewServerStream(data, streamRPCDiscovery, hc.option, service, hc.serializer)
+			newstm, err = stream.NewServerStream(data, streamRPCDiscovery, hc.option, service, hc.twowayCodec)
 			if err != nil {
 				hc.option.Logger.Error("newServerStream error", err)
 				return nil, err
 			}
 		}
-	default:
-		hc.option.Logger.Errorf("http2 controller serializer type = %s is invalid", hc.option.SerializerType)
-		return nil, perrors.Errorf("http2 controller serializer type = %s is invalid", hc.option.SerializerType)
+	} else {
+		service, ok := serviceInterface.(common.TripleUnaryService)
+		if !ok {
+			return nil, status.Err(codes.Internal, "can't assert impl of interface "+interfaceKey+" to TripleUnaryService")
+		}
+		// hessian twowayCodec doesn't need to use grpc.Desc, and now only support unary invocation
+		var err error
+		newstm, err = stream.NewUnaryServerStreamWithOutDesc(data, hc.option, service, hc.twowayCodec, hc.option)
+		if err != nil {
+			hc.option.Logger.Errorf("hessian server new server stream error = %v", err)
+			return nil, err
+		}
 	}
 
 	return newstm, nil
@@ -430,12 +427,12 @@ func (hc *H2Controller) StreamInvoke(ctx context.Context, path string) (grpc.Cli
 		hc.option.Logger.Errorf("triple get package handler error = %v", err)
 		return nil, err
 	}
-	return stream.NewClientUserStream(clientStream, hc.serializer, pkgHandler, hc.option), nil
+	return stream.NewClientUserStream(clientStream, hc.twowayCodec, pkgHandler, hc.option), nil
 }
 
 // UnaryInvoke can start unary invocation, called by dubbo3 client, with @path and request @data
 func (hc *H2Controller) UnaryInvoke(ctx context.Context, path string, arg, reply interface{}) error {
-	data, err := hc.serializer.MarshalRequest(arg)
+	data, err := hc.twowayCodec.MarshalRequest(arg)
 	if err != nil {
 		hc.option.Logger.Errorf("client request marshal error = %v", err)
 		return err
@@ -576,7 +573,7 @@ LOOP:
 	}
 
 	// all split data are collected and to unmarshal
-	if err := hc.serializer.UnmarshalResponse(splitBuffer.Bytes(), reply); err != nil {
+	if err := hc.twowayCodec.UnmarshalResponse(splitBuffer.Bytes(), reply); err != nil {
 		hc.option.Logger.Errorf("client unmarshal rsp err= %v\n", err)
 		return err
 	}

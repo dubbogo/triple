@@ -45,16 +45,16 @@ func TestWithClientTimeout(t *testing.T) {
 
 func TestWithSerializerType(t *testing.T) {
 	opt := NewTripleOption(
-		WithSerializerType(constant.HessianSerializerName),
+		WithSerializerType(constant.HessianCodecName),
 	)
 	assert.NotNil(t, opt)
-	assert.Equal(t, opt.SerializerType, constant.HessianSerializerName)
+	assert.Equal(t, opt.CodecType, constant.HessianCodecName)
 
 	opt = NewTripleOption(
-		WithSerializerType(constant.PBSerializerName),
+		WithSerializerType(constant.PBCodecName),
 	)
 	assert.NotNil(t, opt)
-	assert.Equal(t, opt.SerializerType, constant.PBSerializerName)
+	assert.Equal(t, opt.CodecType, constant.PBCodecName)
 }
 
 func TestWithBufferSize(t *testing.T) {
@@ -115,5 +115,5 @@ func TestValidate(t *testing.T) {
 	assert.Equal(t, uint32(constant.DefaultHttp2ControllerReadBufferSize), opt.BufferSize)
 	assert.Equal(t, constant.DefaultListeningAddress, opt.Location)
 	assert.Equal(t, constant.TRIPLE, opt.Protocol)
-	assert.Equal(t, constant.PBSerializerName, opt.SerializerType)
+	assert.Equal(t, constant.PBCodecName, opt.CodecType)
 }

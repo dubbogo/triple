@@ -23,13 +23,11 @@ import (
 )
 
 import (
-	perrors "github.com/pkg/errors"
-
 	netTriple "github.com/dubbogo/net/http2/triple"
+	perrors "github.com/pkg/errors"
 )
 
 import (
-	"github.com/dubbogo/triple/pkg/common/constant"
 	"github.com/dubbogo/triple/pkg/config"
 )
 
@@ -72,41 +70,4 @@ func GetPackagerHandler(option *config.Option) (PackageHandler, error) {
 // nolint
 func SetPackageHandler(protocol string, f PackageHandlerFactory) {
 	packageHandlerFactoryMap[protocol] = f
-}
-
-// Dubbo3Coder
-type Dubbo3Coder interface {
-	MarshalRequest(interface{}) ([]byte, error)
-	MarshalResponse(interface{}) ([]byte, error)
-}
-
-// Dubbo3Decoder
-type Dubbo3Decoder interface {
-	UnmarshalRequest(data []byte, v interface{}) error
-	UnmarshalResponse(data []byte, v interface{}) error
-}
-
-// Dubbo3Serializer
-type Dubbo3Serializer interface {
-	Dubbo3Coder
-	Dubbo3Decoder
-}
-
-// nolint
-type SerializerFactory func() Dubbo3Serializer
-
-var dubbo3SerializerMap = make(map[string]SerializerFactory)
-
-// nolint
-func GetDubbo3Serializer(opt *config.Option) (Dubbo3Serializer, error) {
-	if f, ok := dubbo3SerializerMap[string(opt.SerializerType)]; ok {
-		return f(), nil
-	}
-	opt.Logger.Error("Serilization ", opt.SerializerType, " factory undefined!")
-	return nil, perrors.New(fmt.Sprintf("Serilization %sfactory undefined!", opt.SerializerType))
-}
-
-// nolint
-func SetDubbo3Serializer(serialization constant.TripleSerializerName, f SerializerFactory) {
-	dubbo3SerializerMap[string(serialization)] = f
 }

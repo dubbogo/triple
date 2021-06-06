@@ -30,7 +30,6 @@ import (
 )
 
 import (
-	"github.com/dubbogo/triple/internal/codec"
 	"github.com/dubbogo/triple/internal/codes"
 	"github.com/dubbogo/triple/internal/message"
 	"github.com/dubbogo/triple/internal/status"
@@ -49,12 +48,12 @@ type processor interface {
 
 // baseProcessor is the basic impl of processor, which contains four base fields, such as rpc status handle function
 type baseProcessor struct {
-	stream     *serverStream
-	pkgHandler common.PackageHandler
-	serializer common.Dubbo3Serializer
-	done       chan struct{}
-	quitOnce   sync.Once
-	opt        *config.Option
+	stream      *serverStream
+	pkgHandler  common.PackageHandler
+	twoWayCodec common.TwoWayCodec
+	done        chan struct{}
+	quitOnce    sync.Once
+	opt         *config.Option
 }
 
 // handleRPCErr writes close message with status of given @err
@@ -87,15 +86,15 @@ type unaryProcessor struct {
 }
 
 // newUnaryProcessor creates unary processor
-func newUnaryProcessor(s *serverStream, pkgHandler common.PackageHandler, desc grpc.MethodDesc, serializer common.Dubbo3Serializer, option *config.Option) (processor, error) {
+func newUnaryProcessor(s *serverStream, pkgHandler common.PackageHandler, desc grpc.MethodDesc, serializer common.TwoWayCodec, option *config.Option) (processor, error) {
 	return &unaryProcessor{
 		baseProcessor: baseProcessor{
-			serializer: serializer,
-			stream:     s,
-			pkgHandler: pkgHandler,
-			done:       make(chan struct{}, 1),
-			quitOnce:   sync.Once{},
-			opt:        option,
+			twoWayCodec: serializer,
+			stream:      s,
+			pkgHandler:  pkgHandler,
+			done:        make(chan struct{}, 1),
+			quitOnce:    sync.Once{},
+			opt:         option,
 		},
 		methodDesc: desc,
 	}, nil
@@ -114,57 +113,45 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 	if e != nil {
 		return nil, e
 	}
-	// p.opt.SerializerType must be one of supported three
-	if p.opt.SerializerType == constant.TripleHessianWrapperSerializerName {
-		dubbo3HessianService, ok := service.(common.Dubbo3UnaryService)
-		if !ok {
-			return nil, status.Errorf(codes.Internal, "hessian provider service doesn't impl Dubbo3UnaryService")
-		}
 
-		var v codec.HessianUnmarshalStruct
-		if err = p.serializer.UnmarshalRequest(pkgData, &v); err != nil {
-			return nil, status.Errorf(codes.Internal, "Unary rpc request unmarshal error: %s", err)
-		}
-		args := v.Val.([]interface{})
-		reply, err = dubbo3HessianService.InvokeWithArgs(header.FieldToCtx(), methodName, args)
-	} else if p.opt.SerializerType == constant.PBSerializerName {
+	if p.opt.CodecType == constant.PBCodecName {
 		descFunc := func(v interface{}) error {
-			if err = p.serializer.UnmarshalRequest(pkgData, v); err != nil {
+			if err = p.twoWayCodec.UnmarshalRequest(pkgData, v); err != nil {
 				return status.Errorf(codes.Internal, "Unary rpc request unmarshal error: %s", err)
 			}
 			return nil
 		}
 		reply, err = p.methodDesc.Handler(service, header.FieldToCtx(), descFunc, nil)
-	} else if p.opt.SerializerType == constant.MsgPackSerializerName {
-		dubbo3HessianService, ok := service.(common.Dubbo3UnaryService)
+	} else {
+		unaryService, ok := service.(common.TripleUnaryService)
 		if !ok {
-			return nil, status.Errorf(codes.Internal, "msgpack provider service doesn't impl Dubbo3UnaryService")
+			return nil, status.Errorf(codes.Internal, "msgpack provider service doesn't impl TripleUnaryService")
 		}
-		reqParam, ok := dubbo3HessianService.GetReqParamsInteface(methodName)
+		reqParam, ok := unaryService.GetReqParamsInteface(methodName)
 		if !ok {
 			return nil, status.Errorf(codes.Internal, "provider unmarshal error: no req param data")
 		}
 		if !ok {
-			return nil, status.Errorf(codes.Internal, "msgpack provider service doesn't impl Dubbo3UnaryService")
+			return nil, status.Errorf(codes.Internal, "msgpack provider service doesn't impl TripleUnaryService")
 		}
 		_, methodName, e := tools.GetServiceKeyAndUpperCaseMethodNameFromPath(header.GetPath())
 		if e != nil {
 			return nil, e
 		}
-		if err = p.serializer.UnmarshalRequest(pkgData, reqParam); err != nil {
+		if err = p.twoWayCodec.UnmarshalRequest(pkgData, reqParam); err != nil {
 			return nil, status.Errorf(codes.Internal, "Unary rpc request unmarshal error: %s", err)
 		}
 		args := make([]interface{}, 0, 1)
 		reqParam = reflect.ValueOf(reqParam).Elem().Interface()
 		args = append(args, reqParam)
-		reply, err = dubbo3HessianService.InvokeWithArgs(header.FieldToCtx(), methodName, args)
+		reply, err = unaryService.InvokeWithArgs(header.FieldToCtx(), methodName, args)
 	}
 
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Unary rpc handle error: %s", err)
 	}
 
-	replyData, err := p.serializer.MarshalResponse(reply)
+	replyData, err := p.twoWayCodec.MarshalResponse(reply)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Unary rpc reoly marshal error: %s", err)
 	}
@@ -217,15 +204,15 @@ type streamingProcessor struct {
 }
 
 // newStreamingProcessor can create new streaming processor
-func newStreamingProcessor(s *serverStream, pkgHandler common.PackageHandler, desc grpc.StreamDesc, serializer common.Dubbo3Serializer, option *config.Option) (processor, error) {
+func newStreamingProcessor(s *serverStream, pkgHandler common.PackageHandler, desc grpc.StreamDesc, serializer common.TwoWayCodec, option *config.Option) (processor, error) {
 	return &streamingProcessor{
 		baseProcessor: baseProcessor{
-			serializer: serializer,
-			stream:     s,
-			pkgHandler: pkgHandler,
-			done:       make(chan struct{}, 1),
-			quitOnce:   sync.Once{},
-			opt:        option,
+			twoWayCodec: serializer,
+			stream:      s,
+			pkgHandler:  pkgHandler,
+			done:        make(chan struct{}, 1),
+			quitOnce:    sync.Once{},
+			opt:         option,
 		},
 		streamDesc: desc,
 	}, nil
@@ -233,7 +220,7 @@ func newStreamingProcessor(s *serverStream, pkgHandler common.PackageHandler, de
 
 // runRPC called by stream
 func (sp *streamingProcessor) runRPC() {
-	serverUserstream := newServerUserStream(sp.stream, sp.serializer, sp.pkgHandler, sp.opt)
+	serverUserstream := newServerUserStream(sp.stream, sp.twoWayCodec, sp.pkgHandler, sp.opt)
 	go func() {
 		if err := sp.streamDesc.Handler(sp.stream.getService(), serverUserstream); err != nil {
 			sp.handleRPCErr(err)

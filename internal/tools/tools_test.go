@@ -37,7 +37,7 @@ func TestValidate(t *testing.T) {
 	assert.Equal(t, uint32(constant.DefaultHttp2ControllerReadBufferSize), opt.BufferSize)
 	assert.Equal(t, constant.DefaultListeningAddress, opt.Location)
 	assert.Equal(t, constant.TRIPLE, opt.Protocol)
-	assert.Equal(t, constant.PBSerializerName, opt.SerializerType)
+	assert.Equal(t, constant.PBCodecName, opt.CodecType)
 }
 
 func TestGetServiceKeyAndUpperCaseMethodNameFromPath(t *testing.T) {

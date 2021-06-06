@@ -24,12 +24,10 @@ import (
 )
 
 import (
-	perrors "github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
 import (
-	"github.com/dubbogo/triple/internal/codec"
 	"github.com/dubbogo/triple/internal/tools"
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
@@ -48,7 +46,7 @@ type TripleClient struct {
 	opt *config.Option
 
 	// serializer is triple serializer to do codec
-	serializer common.Dubbo3Serializer
+	serializer common.Codec
 }
 
 // NewTripleClient creates triple client
@@ -67,7 +65,7 @@ func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error
 	}
 
 	// put dubbo3 network logic to tripleConn, creat pb stub invoker
-	if opt.SerializerType == constant.PBSerializerName {
+	if opt.CodecType == constant.PBCodecName {
 		tripleClient.StubInvoker = reflect.ValueOf(getInvoker(impl, newTripleConn(tripleClient)))
 	}
 
@@ -91,35 +89,20 @@ func (t *TripleClient) connect(opt *config.Option) error {
 
 // Invoke call remote using stub
 func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply interface{}) error {
-	switch t.opt.SerializerType {
-	case constant.PBSerializerName:
+	if t.opt.CodecType == constant.PBCodecName {
 		method := t.StubInvoker.MethodByName(methodName)
-		// call function in pb.go
 		res := method.Call(in)
 		if res[1].IsValid() && res[1].Interface() != nil {
 			return res[1].Interface().(error)
 		}
 		_ = tools.ReflectResponse(res[0], reply)
-	case constant.TripleHessianWrapperSerializerName:
-		// todo: fix hessian as msgPack without usage of HessianUnmarshalStruct
-		out := codec.HessianUnmarshalStruct{}
-		ctx := in[0].Interface().(context.Context)
-		interfaceKey := ctx.Value(constant.InterfaceKey).(string)
-		err := t.Request(ctx, "/"+interfaceKey+"/"+methodName, in[1].Interface(), &out)
-		if err != nil {
-			return err
-		}
-		_ = tools.ReflectResponse(out.Val, reply)
-	case constant.MsgPackSerializerName:
+	} else {
 		ctx := in[0].Interface().(context.Context)
 		interfaceKey := ctx.Value(constant.InterfaceKey).(string)
 		err := t.Request(ctx, "/"+interfaceKey+"/"+methodName, in[1].Interface(), reply)
 		if err != nil {
 			return err
 		}
-	default:
-		t.opt.Logger.Errorf("Invalid triple client serializerType = %s", t.opt.SerializerType)
-		return perrors.Errorf("Invalid triple client serializerType = %s", t.opt.SerializerType)
 	}
 	return nil
 }
