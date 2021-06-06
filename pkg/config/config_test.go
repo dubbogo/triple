@@ -45,13 +45,13 @@ func TestWithClientTimeout(t *testing.T) {
 
 func TestWithSerializerType(t *testing.T) {
 	opt := NewTripleOption(
-		WithSerializerType(constant.HessianCodecName),
+		WithCodecType(constant.HessianCodecName),
 	)
 	assert.NotNil(t, opt)
 	assert.Equal(t, opt.CodecType, constant.HessianCodecName)
 
 	opt = NewTripleOption(
-		WithSerializerType(constant.PBCodecName),
+		WithCodecType(constant.PBCodecName),
 	)
 	assert.NotNil(t, opt)
 	assert.Equal(t, opt.CodecType, constant.PBCodecName)
