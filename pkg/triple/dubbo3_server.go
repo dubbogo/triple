@@ -27,7 +27,7 @@ import (
 )
 
 import (
-	"golang.org/x/net/http2"
+	"github.com/dubbogo/net/http2"
 )
 
 import (

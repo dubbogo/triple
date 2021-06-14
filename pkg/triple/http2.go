@@ -145,7 +145,8 @@ func (hc *H2Controller) readSplitData(rBody io.ReadCloser) chan message.Message 
 
 // GetHandler is called by server when receiving tcp conn, to deal with http2 request
 func (hc *H2Controller) GetHandler() func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(wi http.ResponseWriter, r *http.Request) {
+		w := wi.(*h2.Http2ResponseWriter)
 		/*
 			triple trailer fields:
 			http 2 trailers are headers fields sent after header response and body response.
@@ -164,7 +165,7 @@ func (hc *H2Controller) GetHandler() func(w http.ResponseWriter, r *http.Request
 		header := headerHandler.ReadFromTripleReqHeader(r)
 
 		// new server stream
-		st, err := hc.newServerStreamFromTripleHedaer(header)
+		st, err := hc.newServerStreamFromTripleHeader(header)
 		if st == nil || err != nil {
 			hc.option.Logger.Errorf("creat server stream error = %v\n", err)
 			rspErrMsg := fmt.Sprintf("creat server stream error = %v\n", err)
@@ -203,6 +204,8 @@ func (hc *H2Controller) GetHandler() func(w http.ResponseWriter, r *http.Request
 		w.Header().Add("Trailer", constant.TrailerKeyGrpcMessage)
 		w.Header().Add("Trailer", constant.TrailerKeyTraceProtoBin)
 		w.Header().Add("content-type", "application/grpc+proto")
+		//w.WriteHeader(200)
+		w.FlushHeader()
 
 		// start receiving response from upper proxy invoker, and forward to remote http2 client
 	LOOP:
@@ -229,6 +232,7 @@ func (hc *H2Controller) GetHandler() func(w http.ResponseWriter, r *http.Request
 				if _, err := w.Write(sendData); err != nil {
 					hc.option.Logger.Errorf(" receiving response from upper proxy invoker error = %v", err)
 				}
+				w.Flush()
 			}
 		}
 
@@ -262,7 +266,7 @@ func NewH2Controller(isServer bool, rpcServiceMap *sync.Map, opt *config.Option)
 
 	codec, err := codecImpl.NewTwoWayCodec(opt.CodecType)
 	if err != nil {
-		opt.Logger.Errorf("find serilizer named %s error = %v", opt.CodecType, err)
+		opt.Logger.Errorf("find serializer named %s error = %v", opt.CodecType, err)
 		return nil, err
 	}
 
@@ -290,7 +294,7 @@ func NewH2Controller(isServer bool, rpcServiceMap *sync.Map, opt *config.Option)
 }
 
 /*
-newServerStreamFromTripleHedaer can create a serverStream by @data read from frame, after receiving a request from client.
+newServerStreamFromTripleHeader can create a serverStream by @data read from frame, after receiving a request from client.
 
 firstly, it checks and gets calling params interfaceKey and methodName and use interfaceKey to find if there is existing service
 secondly, it judge if it is streaming rpc or unary rpc
@@ -299,7 +303,7 @@ thirdly, new stream and return
 any error occurs in the above procedures are fatal, as the invocation target can't be found.
 todo how to deal with error in this procedure gracefully is to be discussed next
 */
-func (hc *H2Controller) newServerStreamFromTripleHedaer(data h2Triple.ProtocolHeader) (stream.Stream, error) {
+func (hc *H2Controller) newServerStreamFromTripleHeader(data h2Triple.ProtocolHeader) (stream.Stream, error) {
 	interfaceKey, methodName, err := tools.GetServiceKeyAndUpperCaseMethodNameFromPath(data.GetPath())
 	if err != nil {
 		return nil, err
