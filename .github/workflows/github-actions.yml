@@ -71,7 +71,7 @@ jobs:
 
     - name: Integrate Test
       run: |
-        chmod +x ./example/integrate_test.sh && ./exmaple/integrate_test.sh ${{github.event.pull_request.head.repo.full_name}} ${{github.event.pull_request.head.sha}}
+        chmod +x ./example/integrate_test.sh && ./example/integrate_test.sh ${{github.event.pull_request.head.repo.full_name}} ${{github.event.pull_request.head.sha}}
 
     - name: Post Coverage
       run: bash <(curl -s https://codecov.io/bash)
