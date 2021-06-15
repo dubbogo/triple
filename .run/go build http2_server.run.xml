@@ -4,7 +4,7 @@
     <working_directory value="$PROJECT_DIR$" />
     <kind value="PACKAGE" />
     <filePath value="$PROJECT_DIR$/example/http2/server/server.go" />
-    <package value="github.com/dubbogo/triple/example/http2/server" />
+    <package value="github.com/dubbogo/triple/example/http2/server/cmd" />
     <directory value="$PROJECT_DIR$" />
     <method v="2" />
   </configuration>

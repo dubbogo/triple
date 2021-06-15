@@ -7,7 +7,7 @@
     </envs>
     <kind value="PACKAGE" />
     <filePath value="$PROJECT_DIR$/example/dubbo/go-server/server.go" />
-    <package value="github.com/dubbogo/triple/test/integrate/dubbo/go-server" />
+    <package value="github.com/dubbogo/triple/example/dubbo/go-server/cmd" />
     <directory value="$PROJECT_DIR$" />
     <method v="2" />
   </configuration>

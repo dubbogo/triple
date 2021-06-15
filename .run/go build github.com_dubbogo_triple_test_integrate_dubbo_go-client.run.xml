@@ -1,10 +1,13 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="go build github.com/dubbogo/triple/test/integrate/dubbo/go-client" type="GoApplicationRunConfiguration" factoryName="Go Application" nameIsGenerated="true">
+  <configuration default="false" name="go build dubbo/go-client" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="triple" />
     <working_directory value="$PROJECT_DIR$/example/dubbo/go-client" />
+    <envs>
+      <env name="CONF_CONSUMER_FILE_PATH" value="$PROJECT_DIR$/example/dubbo/go-client/conf/client.yml" />
+    </envs>
     <kind value="PACKAGE" />
     <filePath value="$PROJECT_DIR$/example/dubbo/go-client/client.go" />
-    <package value="github.com/dubbogo/triple/test/integrate/dubbo/go-client" />
+    <package value="github.com/dubbogo/triple/example/dubbo/go-client/cmd" />
     <directory value="$PROJECT_DIR$" />
     <method v="2" />
   </configuration>

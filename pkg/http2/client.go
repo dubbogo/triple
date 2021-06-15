@@ -55,6 +55,9 @@ func (h *Http2Client) StreamPost(addr, path string, sendChan chan *bytes.Buffer,
 			case <-closeChan:
 				return
 			case sendMsg := <-sendChan:
+				if sendMsg == nil {
+					return
+				}
 				sendStreamChan <- h2Triple.BufferMsg{
 					Buffer:  bytes.NewBuffer(h.frameHandler.Pkg2FrameData(sendMsg.Bytes())),
 					MsgType: h2Triple.DataMsgType,
