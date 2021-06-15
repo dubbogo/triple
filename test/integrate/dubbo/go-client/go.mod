@@ -7,6 +7,7 @@ require (
 	github.com/dubbogo/triple v1.0.0
 	github.com/golang/protobuf v1.5.2
 	github.com/pelletier/go-toml v1.4.0 // indirect
+	github.com/stretchr/testify v1.7.0
 	google.golang.org/grpc v1.36.0
 	honnef.co/go/tools v0.0.1-2020.1.3 // indirect
 )
