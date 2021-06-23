@@ -4,11 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	h2 "github.com/dubbogo/net/http2"
-	"github.com/dubbogo/triple/pkg/common"
-	"github.com/dubbogo/triple/pkg/common/constant"
-	"github.com/dubbogo/triple/pkg/common/logger"
-	tconfig "github.com/dubbogo/triple/pkg/config"
 	"io"
 	"net"
 	"net/http"
@@ -19,23 +14,29 @@ import (
 
 import (
 	"github.com/dubbogo/net/http2"
+	perrors "github.com/pkg/errors"
 )
 
 import (
+	"github.com/dubbogo/triple/pkg/common"
+	"github.com/dubbogo/triple/pkg/common/constant"
+	"github.com/dubbogo/triple/pkg/common/logger"
+	tconfig "github.com/dubbogo/triple/pkg/config"
 	tConfig "github.com/dubbogo/triple/pkg/http2/config"
 )
 
-type Http2Handler func(path string, header map[string]string, recvChan chan *bytes.Buffer, sendChan chan *bytes.Buffer, controlch chan map[string]string)
+type Http2Handler func(path string, header http.Header, recvChan chan *bytes.Buffer, sendChan chan *bytes.Buffer, ctrlch chan http.Header, errCh chan interface{})
 
 // TripleServer is the object that can be started and listening remote request
 type Http2Server struct {
-	lst            net.Listener
-	lock           sync.Mutex
-	httpHandlerMap map[string]Http2Handler
-	done           chan struct{}
-	address        string
-	logger         logger.Logger
-	frameHandler   common.PackageHandler
+	lst                net.Listener
+	lock               sync.Mutex
+	httpHandlerMap     map[string]Http2Handler
+	done               chan struct{}
+	address            string
+	logger             logger.Logger
+	frameHandler       common.PackageHandler
+	pathHandlerMatcher common.PathHandlerMatcher
 }
 
 // NewHttp2Server
@@ -44,13 +45,19 @@ func NewHttp2Server(address string, conf tConfig.ServerConfig) *Http2Server {
 	if err != nil {
 		panic(err)
 	}
+
+	pathHandlerMatcher := conf.PathHandlerMatcher
+	if pathHandlerMatcher == nil {
+		pathHandlerMatcher = &defaultPathHandlerMatcher{}
+	}
 	return &Http2Server{
-		frameHandler:   headerHandler,
-		address:        address,
-		logger:         conf.Logger,
-		done:           make(chan struct{}, 1),
-		httpHandlerMap: make(map[string]Http2Handler),
-		lock:           sync.Mutex{},
+		frameHandler:       headerHandler,
+		address:            address,
+		logger:             conf.Logger,
+		done:               make(chan struct{}),
+		httpHandlerMap:     make(map[string]Http2Handler),
+		pathHandlerMatcher: pathHandlerMatcher,
+		lock:               sync.Mutex{},
 	}
 }
 
@@ -65,7 +72,7 @@ func (t *Http2Server) Stop() {
 	//if t.h2Controller != nil {
 	//	t.h2Controller.Destroy()
 	//}
-	t.done <- struct{}{}
+	close(t.done)
 }
 
 // Start can start a triple server
@@ -150,17 +157,6 @@ func (t *Http2Server) handleRawConn(conn net.Conn) error {
 	srv.ServeConn(conn, opts)
 	return nil
 }
-func readFromHttp2ReqHeader(r *http.Request) (string, map[string]string) {
-	header := r.Header
-	path := r.URL.Path
-	result := make(map[string]string)
-	for k, v := range header {
-		if len(v) > 0 {
-			result[k] = v[0]
-		}
-	}
-	return path, result
-}
 
 // skipHeader is to skip first 5 byte from dataframe with header
 func skipHeader(frameData []byte) ([]byte, uint32) {
@@ -228,12 +224,15 @@ func readSplitData(rBody io.ReadCloser) chan *bytes.Buffer {
 }
 
 func (h *Http2Server) http2HandleFunction(wi http.ResponseWriter, r *http.Request) {
-	w := wi.(*h2.Http2ResponseWriter)
-	path, headerField := readFromHttp2ReqHeader(r)
+	w := wi.(*http2.Http2ResponseWriter)
+	path := r.URL.Path
+	headerField := r.Header
 	sendChan := make(chan *bytes.Buffer)
 	recvChan := make(chan *bytes.Buffer)
-	firstRspCh := make(chan map[string]string)
+	ctrlChan := make(chan http.Header)
+	errChan := make(chan interface{})
 	readChan := readSplitData(r.Body)
+	var handler Http2Handler
 	go func() {
 		for {
 			select {
@@ -248,35 +247,53 @@ func (h *Http2Server) http2HandleFunction(wi http.ResponseWriter, r *http.Reques
 		}
 	}()
 
-	go func() {
-		if handler, ok := h.httpHandlerMap[path]; ok {
-			handler(path, headerField, recvChan, sendChan, firstRspCh)
-		} else {
-			return
+	for k, v := range h.httpHandlerMap {
+		if h.pathHandlerMatcher.Match(path, k) {
+			handler = v
 		}
+	}
+	if handler == nil {
+		//todo add error handler interface, let user define their handler
+		err := perrors.Errorf("request path = %s, which is not match any handler", path)
+		h.logger.Warn(err)
+		w.WriteHeader(400)
+		if _, err2 := w.Write([]byte(err.Error())); err2 != nil {
+			h.logger.Errorf("write back rsp error message %s, with err = %v", err.Error(), err2)
+		}
+		return
+	}
+
+	go func() {
+		handler(path, headerField, recvChan, sendChan, ctrlChan, errChan)
 	}()
 
 	// first response
-	firstRspHeaderMap := <-firstRspCh
+	firstRspHeaderMap := <-ctrlChan
 	for k, v := range firstRspHeaderMap {
-		if v == "Trailer" {
+		if len(v) > 0 && v[0] == "Trailer" {
 			w.Header().Add("Trailer", k)
-			continue
+		} else {
+			for _, vi := range v {
+				w.Header().Add(k, vi)
+			}
 		}
 	}
-	for k, v := range firstRspHeaderMap {
-		if v != "Trailer" {
-			w.Header().Add(k, v)
-		}
-	}
+	w.Header().Add("Trailer", constant.TrailerKeyHttp2Message)
+	w.Header().Add("Trailer", constant.TrailerKeyHttp2Status)
 	w.WriteHeader(200)
 	w.FlushHeader()
+	success := true
+	errorMsg := ""
 LOOP:
 	for {
 		select {
 		// todo close
+		case err := <-errChan:
+			success = false
+			errorMsg = err.(error).Error()
+			break LOOP
 		case sendMsg := <-sendChan:
-			if sendMsg == nil {
+			if sendMsg == nil { // sendChanClose
 				break LOOP
 			}
 			sendData := h.frameHandler.Pkg2FrameData(sendMsg.Bytes())
@@ -287,14 +304,29 @@ LOOP:
 		}
 	}
 
-	trailerMap := <-firstRspCh
+	trailerMap := <-ctrlChan
+	if success {
+		trailerMap[constant.TrailerKeyHttp2Status] = []string{"0"}
+		trailerMap[constant.TrailerKeyHttp2Message] = []string{""}
+	} else {
+		trailerMap[constant.TrailerKeyHttp2Status] = []string{"1"}
+		trailerMap[constant.TrailerKeyHttp2Message] = []string{errorMsg}
+	}
 	WriteTripleFinalRspHeaderField(w, trailerMap)
-	//close
 }
 
 // WriteTripleFinalRspHeaderField returns trailers header fields that triple and grpc defined
-func WriteTripleFinalRspHeaderField(w *http2.Http2ResponseWriter, trailer map[string]string) {
+func WriteTripleFinalRspHeaderField(w *http2.Http2ResponseWriter, trailer http.Header) {
 	for k, v := range trailer {
-		w.Header().Set(k, v)
+		if len(v) > 0 {
+			w.Header().Set(k, v[0])
+		}
 	}
+}
+
+type defaultPathHandlerMatcher struct {
+}
+
+func (d *defaultPathHandlerMatcher) Match(path string, rule string) bool {
+	return path == rule
 }

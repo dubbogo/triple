@@ -67,6 +67,12 @@ const (
 
 	// TrailerKeyTraceProtoBin is triple trailer header
 	TrailerKeyTraceProtoBin = "trace-proto-bin"
+
+	// TrailerKeyHttp2Success is http2 pkg trailer key of success
+	TrailerKeyHttp2Status = "http2-status"
+
+	// TrailerKeyHttp2Message is http2 pkg trailer key of error message
+	TrailerKeyHttp2Message = "http2-message"
 )
 
 const (

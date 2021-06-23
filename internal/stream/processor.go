@@ -49,7 +49,6 @@ type processor interface {
 // baseProcessor is the basic impl of processor, which contains four base fields, such as rpc status handle function
 type baseProcessor struct {
 	stream      *serverStream
-	pkgHandler  common.PackageHandler
 	twoWayCodec common.TwoWayCodec
 	done        chan struct{}
 	quitOnce    sync.Once
@@ -86,12 +85,11 @@ type unaryProcessor struct {
 }
 
 // newUnaryProcessor creates unary processor
-func newUnaryProcessor(s *serverStream, pkgHandler common.PackageHandler, desc grpc.MethodDesc, serializer common.TwoWayCodec, option *config.Option) (processor, error) {
+func newUnaryProcessor(s *serverStream, desc grpc.MethodDesc, serializer common.TwoWayCodec, option *config.Option) (processor, error) {
 	return &unaryProcessor{
 		baseProcessor: baseProcessor{
 			twoWayCodec: serializer,
 			stream:      s,
-			pkgHandler:  pkgHandler,
 			done:        make(chan struct{}, 1),
 			quitOnce:    sync.Once{},
 			opt:         option,
@@ -104,8 +102,6 @@ func newUnaryProcessor(s *serverStream, pkgHandler common.PackageHandler, desc g
 func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, header h2Triple.ProtocolHeader) ([]byte, error) {
 	readBuf := buf.Bytes()
 
-	pkgData, _ := p.pkgHandler.Frame2PkgData(readBuf)
-
 	var reply interface{}
 	var err error
 
@@ -116,7 +112,7 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 
 	if p.opt.CodecType == constant.PBCodecName {
 		descFunc := func(v interface{}) error {
-			if err = p.twoWayCodec.UnmarshalRequest(pkgData, v); err != nil {
+			if err = p.twoWayCodec.UnmarshalRequest(readBuf, v); err != nil {
 				return status.Errorf(codes.Internal, "Unary rpc request unmarshal error: %s", err)
 			}
 			return nil
@@ -138,7 +134,7 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 		if e != nil {
 			return nil, e
 		}
-		if err = p.twoWayCodec.UnmarshalRequest(pkgData, reqParam); err != nil {
+		if err = p.twoWayCodec.UnmarshalRequest(readBuf, reqParam); err != nil {
 			return nil, status.Errorf(codes.Internal, "Unary rpc request unmarshal error: %s", err)
 		}
 		args := make([]interface{}, 0, 1)
@@ -156,8 +152,7 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 		return nil, status.Errorf(codes.Internal, "Unary rpc reoly marshal error: %s", err)
 	}
 
-	rspFrameData := p.pkgHandler.Pkg2FrameData(replyData)
-	return rspFrameData, nil
+	return replyData, nil
 }
 
 // runRPC is called by lower layer's stream
@@ -204,12 +199,11 @@ type streamingProcessor struct {
 }
 
 // newStreamingProcessor can create new streaming processor
-func newStreamingProcessor(s *serverStream, pkgHandler common.PackageHandler, desc grpc.StreamDesc, serializer common.TwoWayCodec, option *config.Option) (processor, error) {
+func newStreamingProcessor(s *serverStream, desc grpc.StreamDesc, serializer common.TwoWayCodec, option *config.Option) (processor, error) {
 	return &streamingProcessor{
 		baseProcessor: baseProcessor{
 			twoWayCodec: serializer,
 			stream:      s,
-			pkgHandler:  pkgHandler,
 			done:        make(chan struct{}, 1),
 			quitOnce:    sync.Once{},
 			opt:         option,
@@ -220,7 +214,7 @@ func newStreamingProcessor(s *serverStream, pkgHandler common.PackageHandler, de
 
 // runRPC called by stream
 func (sp *streamingProcessor) runRPC() {
-	serverUserstream := newServerUserStream(sp.stream, sp.twoWayCodec, sp.pkgHandler, sp.opt)
+	serverUserstream := newServerUserStream(sp.stream, sp.twoWayCodec, sp.opt)
 	go func() {
 		if err := sp.streamDesc.Handler(sp.stream.getService(), serverUserstream); err != nil {
 			sp.handleRPCErr(err)

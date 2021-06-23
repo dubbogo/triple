@@ -9,14 +9,14 @@ import (
 // ProtocolHeaderHandlerImpl is the triple imple of net.ProtocolHeaderHandler
 // it handles the change of triple header field and h2 field
 type ProtocolHeaderHandlerImpl struct {
-	Ctx         context.Context
-	reqFieldMap map[string]string
+	Ctx       context.Context
+	reqHeader http.Header
 }
 
 // NewProtocolHeaderHandlerImpl returns new TripleHeaderHandler
-func NewProtocolHeaderHandlerImpl(reqFieldMap map[string]string) h2Triple.ProtocolHeaderHandler {
+func NewProtocolHeaderHandlerImpl(reqHeader http.Header) h2Triple.ProtocolHeaderHandler {
 	return &ProtocolHeaderHandlerImpl{
-		reqFieldMap: reqFieldMap,
+		reqHeader: reqHeader,
 	}
 }
 
@@ -24,8 +24,8 @@ func NewProtocolHeaderHandlerImpl(reqFieldMap map[string]string) h2Triple.Protoc
 // it parse field of opt and ctx to HTTP2 Header field, developer must assure "tri-" prefix field be string
 // if not, it will cause panic!
 func (t *ProtocolHeaderHandlerImpl) WriteTripleReqHeaderField(header http.Header) http.Header {
-	for k, v := range t.reqFieldMap {
-		header[k] = []string{v}
+	for k, v := range t.reqHeader {
+		header[k] = v
 	}
 	return header
 }

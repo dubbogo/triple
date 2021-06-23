@@ -20,8 +20,6 @@ package http2_handler
 import (
 	"bytes"
 	"context"
-	"github.com/dubbogo/triple/internal/codec"
-	"github.com/dubbogo/triple/pkg/http2"
 	"net/http"
 	"strconv"
 	"sync"
@@ -33,6 +31,7 @@ import (
 )
 
 import (
+	"github.com/dubbogo/triple/internal/codec"
 	codecImpl "github.com/dubbogo/triple/internal/codec/twoway_codec_impl"
 	"github.com/dubbogo/triple/internal/codes"
 	"github.com/dubbogo/triple/internal/message"
@@ -42,6 +41,7 @@ import (
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
 	"github.com/dubbogo/triple/pkg/config"
+	"github.com/dubbogo/triple/pkg/http2"
 	http2_config "github.com/dubbogo/triple/pkg/http2/config"
 )
 
@@ -87,6 +87,8 @@ func (hc *H2Controller) GetHandler(rpcService interface{}) http2.Http2Handler {
 		if st == nil || err != nil {
 			hc.option.Logger.Errorf("creat server stream error = %v\n", err)
 			errCh <- err
+			close(sendChan)
+			return
 		}
 		streamSendChan := st.GetSend()
 		closeChan := make(chan struct{})
@@ -101,6 +103,7 @@ func (hc *H2Controller) GetHandler(rpcService interface{}) http2.Http2Handler {
 				case msgData := <-recvChan:
 					if msgData != nil {
 						st.PutRecv(msgData.Bytes(), message.DataMsgType)
+						continue
 					}
 					return
 				}
@@ -113,6 +116,7 @@ func (hc *H2Controller) GetHandler(rpcService interface{}) http2.Http2Handler {
 		rspHeader[constant.TrailerKeyTraceProtoBin] = []string{"Trailer"}
 		ctrlch <- rspHeader
 		// start receiving response from upper proxy invoker, and forward to remote http2 client
+
 	LOOP:
 		for {
 			select {
@@ -127,17 +131,23 @@ func (hc *H2Controller) GetHandler(rpcService interface{}) http2.Http2Handler {
 						grpcCode = int(sendMsg.Status.Code())
 						grpcMessage = sendMsg.Status.Message()
 					}
-					// call finished
 					break LOOP
 				}
 				sendChan <- sendMsg.Buffer
 			}
 		}
 
+		if grpcCode == 0 {
+			close(sendChan)
+		} else {
+			errCh <- perrors.New(grpcMessage)
+		}
+
 		// second response header with trailer fields
 		rspTrialer := make(map[string][]string)
 		rspTrialer[constant.TrailerKeyGrpcStatus] = []string{strconv.Itoa(grpcCode)}
 		rspTrialer[constant.TrailerKeyGrpcMessage] = []string{grpcMessage}
+
 		// todo now if add this field, java-provider may caused unexpected error.
 		//rspTrialer[constant.TripleTraceProtoBin] = []string{strconv.Itoa(traceProtoBin)}
 		ctrlch <- rspTrialer
@@ -267,6 +277,9 @@ func (hc *H2Controller) StreamInvoke(ctx context.Context, path string) (grpc.Cli
 				clientStream.Close()
 				return
 			case sendMsg := <-tosend:
+				if sendMsg.MsgType == message.ServerStreamCloseMsgType {
+					return
+				}
 				sendStreamChan <- bytes.NewBuffer(sendMsg.Bytes())
 			}
 		}
@@ -285,27 +298,28 @@ func (hc *H2Controller) StreamInvoke(ctx context.Context, path string) (grpc.Cli
 		close(closeChan)
 		return nil, err
 	}
-LOOP:
-	for {
-		select {
-		case <-hc.closeChan:
-			close(closeChan)
-		case data := <-dataChan:
-			if data == nil {
-				// stream receive done, close send go routine
+	go func() {
+	LOOP:
+		for {
+			select {
+			case <-hc.closeChan:
 				close(closeChan)
-				break LOOP
+			case data := <-dataChan:
+				if data == nil {
+					// stream receive done, close send go routine
+					close(closeChan)
+					break LOOP
+				}
+				clientStream.PutRecv(data.Bytes(), message.DataMsgType)
 			}
-			clientStream.PutRecv(data.Bytes(), message.DataMsgType)
 		}
-
-	}
-	trailer := <-rspHeaderChan
-	code, _ := strconv.Atoi(trailer.Get(constant.TrailerKeyGrpcStatus))
-	msg := trailer.Get(constant.TrailerKeyGrpcMessage)
-	if codes.Code(code) != codes.OK {
-		hc.option.Logger.Errorf("grpc status not success,msg = %s, code = %d", msg, code)
-	}
+		trailer := <-rspHeaderChan
+		code, _ := strconv.Atoi(trailer.Get(constant.TrailerKeyGrpcStatus))
+		msg := trailer.Get(constant.TrailerKeyGrpcMessage)
+		if codes.Code(code) != codes.OK {
+			hc.option.Logger.Errorf("grpc status not success,msg = %s, code = %d", msg, code)
+		}
+	}()
 
 	return stream.NewClientUserStream(clientStream, hc.twowayCodec, hc.option), nil
 }
@@ -329,7 +343,7 @@ func (hc *H2Controller) UnaryInvoke(ctx context.Context, path string, arg, reply
 		HeaderField: newHeader,
 	})
 	if err != nil {
-		hc.option.Logger.Errorf("triple unary invoke error = %v", err)
+		hc.option.Logger.Errorf("triple unary invoke path %s with addr = %s error = %v", path, hc.address, err)
 		return err
 	}
 
