@@ -3,19 +3,24 @@ package tests
 import (
 	"bytes"
 	"fmt"
+	"net/http"
+	"testing"
+)
+import (
+	"github.com/stretchr/testify/assert"
+)
+import (
 	"github.com/dubbogo/triple/pkg/common/logger/default_logger"
 	tconfig "github.com/dubbogo/triple/pkg/config"
 	"github.com/dubbogo/triple/pkg/http2"
 	"github.com/dubbogo/triple/pkg/http2/config"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestStream(t *testing.T) {
 	client := http2.NewHttp2Client(tconfig.Option{Logger: default_logger.GetDefaultLogger()})
-	header := make(map[string]string)
-	header["header1"] = "header1-val"
-	header["header2"] = "header2-val"
+	header := make(http.Header)
+	header["header1"] = []string{"header1-val"}
+	header["header2"] = []string{"header2-val"}
 	sendChan := make(chan *bytes.Buffer)
 	dataChan, rspHeaderChan, err := client.StreamPost("localhost:1999", "/stream", sendChan, &config.PostConfig{
 		ContentType: "application/grpc+proto",
@@ -41,9 +46,9 @@ func TestStream(t *testing.T) {
 
 func TestUnary(t *testing.T) {
 	client := http2.NewHttp2Client(tconfig.Option{Logger: default_logger.GetDefaultLogger()})
-	header := make(map[string]string)
-	header["header1"] = "header1-val"
-	header["header2"] = "header2-val"
+	header := make(http.Header)
+	header["header1"] = []string{"header1-val"}
+	header["header2"] = []string{"header2-val"}
 	data, rspHeader, err := client.Post("localhost:1999", "/unary", []byte("hello"), &config.PostConfig{
 		ContentType: "application",
 		BufferSize:  4096,

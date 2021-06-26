@@ -12,6 +12,7 @@ import (
 	"github.com/dubbogo/triple/pkg/http2/config"
 	perrors "github.com/pkg/errors"
 	"net"
+	"strconv"
 	"time"
 
 	_ "github.com/dubbogo/triple/internal/codec"
@@ -44,11 +45,11 @@ type Http2Client struct {
 	logger       logger.Logger
 }
 
-func (h *Http2Client) StreamPost(addr, path string, sendChan chan *bytes.Buffer, opts *config.PostConfig) (chan *bytes.Buffer, chan map[string]string, error) {
+func (h *Http2Client) StreamPost(addr, path string, sendChan chan *bytes.Buffer, opts *config.PostConfig) (chan *bytes.Buffer, chan http.Header, error) {
 	sendStreamChan := make(chan h2Triple.BufferMsg)
 	closeChan := make(chan struct{})
 	recvChan := make(chan *bytes.Buffer)
-	trailerChan := make(chan map[string]string)
+	trailerChan := make(chan http.Header)
 	go func() {
 		for {
 			select {
@@ -82,7 +83,7 @@ func (h *Http2Client) StreamPost(addr, path string, sendChan chan *bytes.Buffer,
 		for {
 			select {
 			case <-closeChan:
-				close(closeChan)
+				close(recvChan)
 				break LOOP
 			case data := <-ch:
 				if data == nil {
@@ -93,12 +94,16 @@ func (h *Http2Client) StreamPost(addr, path string, sendChan chan *bytes.Buffer,
 			}
 		}
 		trailer := rsp.Body.(*h2Triple.ResponseBody).GetTrailer()
-		trailerChan <- trailerToMap(trailer)
+		// todo streaming error
+		//if status, err := strconv.Atoi(trailer.Get(constant.TrailerKeyHttp2Status)); err != nil ||status != 0 {
+		//
+		//}
+		trailerChan <- trailer
 	}()
 	return recvChan, trailerChan, nil
 }
 
-func (h *Http2Client) Post(addr, path string, data []byte, opts *config.PostConfig) ([]byte, map[string]string, error) {
+func (h *Http2Client) Post(addr, path string, data []byte, opts *config.PostConfig) ([]byte, http.Header, error) {
 	sendStreamChan := make(chan h2Triple.BufferMsg, 2)
 
 	sendStreamChan <- h2Triple.BufferMsg{
@@ -195,10 +200,11 @@ LOOP:
 		case tra := <-trailerChan:
 			trailer = tra
 			recvTrailer = true
-			//statusCode, _ := strconv.Atoi(tra.Get(constant.TrailerKeyGrpcStatus))
-			//if statusCode != 0 {
-			//	break LOOP
-			//}
+			http2StatusCode, _ := strconv.Atoi(tra.Get(constant.TrailerKeyHttp2Status))
+			if http2StatusCode != 0 {
+				// todo deal with http2 error
+				break LOOP
+			}
 
 		case <-timeoutTicker:
 			// close reading loop ablove
@@ -210,7 +216,7 @@ LOOP:
 	}
 
 	if timeoutFlag {
-		h.logger.Errorf("unary call %s timeout", path)
+		h.logger.Errorf("unary call %s with addr = %s timeout", path, addr)
 		return nil, nil, perrors.Errorf("unary call %s timeout", path)
 	}
 
@@ -220,15 +226,5 @@ LOOP:
 		trailer = rsp.Body.(*h2Triple.ResponseBody).GetTrailer()
 	}
 
-	return splitBuffer.Bytes(), trailerToMap(trailer), nil
-}
-
-func trailerToMap(header http.Header) map[string]string {
-	result := make(map[string]string)
-	for k, v := range header {
-		if len(v) > 0 {
-			result[k] = v[0]
-		}
-	}
-	return result
+	return splitBuffer.Bytes(), trailer, nil
 }

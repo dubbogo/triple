@@ -42,7 +42,6 @@ func init() {
 // TripleHeader stores the needed http2 header fields of triple protocol
 type TripleHeader struct {
 	Path           string
-	StreamID       uint32
 	ContentType    string
 	ServiceVersion string
 	ServiceGroup   string
@@ -54,6 +53,39 @@ type TripleHeader struct {
 	GrpcStatus     string
 	GrpcMessage    string
 	Authorization  []string
+}
+
+func NewTripleHeader(path string, header http.Header) h2Triple.ProtocolHeader {
+	tripleHeader := &TripleHeader{}
+	tripleHeader.Path = path
+	for k, v := range header {
+		switch k {
+		case textproto.CanonicalMIMEHeaderKey(constant.TripleServiceVersion):
+			tripleHeader.ServiceVersion = v[0]
+		case textproto.CanonicalMIMEHeaderKey(constant.TripleServiceGroup):
+			tripleHeader.ServiceGroup = v[0]
+		case textproto.CanonicalMIMEHeaderKey(constant.TripleRequestID):
+			tripleHeader.RPCID = v[0]
+		case textproto.CanonicalMIMEHeaderKey(constant.TripleTraceID):
+			tripleHeader.TracingID = v[0]
+		case textproto.CanonicalMIMEHeaderKey(constant.TripleTraceID):
+			tripleHeader.TracingRPCID = v[0]
+		case textproto.CanonicalMIMEHeaderKey(constant.TripleTraceProtoBin):
+			tripleHeader.TracingContext = v[0]
+		case textproto.CanonicalMIMEHeaderKey(constant.TripleUnitInfo):
+			tripleHeader.ClusterInfo = v[0]
+		case textproto.CanonicalMIMEHeaderKey("content-type"):
+			tripleHeader.ContentType = v[0]
+		case textproto.CanonicalMIMEHeaderKey("authorization"):
+			tripleHeader.ContentType = v[0]
+		// todo: usage of these part of fields needs to be discussed later
+		//case "grpc-encoding":
+		//case "grpc-status":
+		//case "grpc-message":
+		default:
+		}
+	}
+	return tripleHeader
 }
 
 func (t *TripleHeader) GetPath() string {

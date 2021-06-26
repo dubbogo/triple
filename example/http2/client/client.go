@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"fmt"
+)
+
+import (
 	"github.com/dubbogo/triple/pkg/common/logger/default_logger"
+	tconfig "github.com/dubbogo/triple/pkg/config"
 	"github.com/dubbogo/triple/pkg/http2"
 	"github.com/dubbogo/triple/pkg/http2/config"
-
-	tconfig "github.com/dubbogo/triple/pkg/config"
 )
 
 const serverAddr = "localhost:1999"
@@ -19,9 +21,9 @@ func main() {
 
 func testStream() {
 	client := http2.NewHttp2Client(tconfig.Option{Logger: default_logger.GetDefaultLogger()})
-	header := make(map[string]string)
-	header["header1"] = "header1-val"
-	header["header2"] = "header2-val"
+	header := make(map[string][]string)
+	header["header1"] = []string{"header1-val"}
+	header["header2"] = []string{"header2-val"}
 	sendChan := make(chan *bytes.Buffer)
 	dataChan, rspHeaderChan, err := client.StreamPost(serverAddr, "/stream", sendChan, &config.PostConfig{
 		ContentType: "application/grpc+proto",
@@ -49,9 +51,9 @@ func testStream() {
 
 func testUnary() {
 	client := http2.NewHttp2Client(tconfig.Option{Logger: default_logger.GetDefaultLogger()})
-	header := make(map[string]string)
-	header["header1"] = "header1-val"
-	header["header2"] = "header2-val"
+	header := make(map[string][]string)
+	header["header1"] = []string{"header1-val"}
+	header["header2"] = []string{"header2-val"}
 	data, rspHeader, err := client.Post(serverAddr, "/unary", []byte("hello"), &config.PostConfig{
 		ContentType: "application",
 		BufferSize:  4096,
