@@ -13,6 +13,7 @@ Triple-go 是一个基于http2协议的go语言协议库，在 [Dubbo-go](https:
 - 与您现有的 grpc 服务完美互通，使您体验兼具dubbo服务治理能力 和 grpc兼容性的框架。
 - 提供双向流式 RPC 调用，并与grpc互通。
 ### 架构图
+
 ![triple-go-arch](https://dubbogo.github.io/img/doc/triple-go-arch.jpg)
 
 ### Triple协议

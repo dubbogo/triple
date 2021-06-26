@@ -16,7 +16,7 @@ It is an amazing (grpc+) protocol, compatible with Dubbo 3.0 and grpc-go. has gr
 - Provide two-way streaming RPC calls and communicate with grpc.
 
 ### Architecture
-![triple-go-arch](https://dubbogo.github.io/img/doc/triple-go-arch.j
+![triple-go-arch](https://dubbogo.github.io/img/doc/triple-go-arch.jpg)
 
 ### Triple Protocol
 
