@@ -3,17 +3,20 @@ dubbo protocol v3 (alias: triple) in Go
 
 [中文版README](./README_zh.md)
 
-### Summary 
+### Summary
 
 Triple-go is a golang network package that based on http2, used by [Dubbo-go](https://github.com/apache/dubbo-go) 3.0.
 
-It is an amazing (grpc+) protocol, compatible with Dubbo 3.0 and grpc-go. has great interoperability with grpc-go and [Dubbo](https://github.com/apache/dubbo) 3.0. 
+It is an amazing (grpc+) protocol, compatible with Dubbo 3.0 and grpc-go. has great interoperability with grpc-go and [Dubbo](https://github.com/apache/dubbo) 3.0.
 
 ### Feature
 
 - Use standard proto IDL to define your dubbo-go service and realize cross-language intercommunication with dubbo-java.
 - Perfect interoperability with your existing grpc services, allowing you to experience a framework with both dubbo service management capabilities and grpc compatibility.
 - Provide two-way streaming RPC calls and communicate with grpc.
+
+### Architecture
+![triple-go-arch](https://dubbogo.github.io/img/doc/triple-go-arch.j
 
 ### Triple Protocol
 
@@ -40,7 +43,7 @@ It is an amazing (grpc+) protocol, compatible with Dubbo 3.0 and grpc-go. has gr
 
     grpc-status: grpc status code
 
-    grpc-message: error message 
+    grpc-message: error message
 
     trace-proto-bin: trace binary data
 
