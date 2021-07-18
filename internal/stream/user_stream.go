@@ -37,7 +37,6 @@ type baseUserStream struct {
 	opt         *config.Option
 	stream      Stream
 	twoWayCodec common.TwoWayCodec
-	pkgHandler  common.PackageHandler
 }
 
 // nolint
@@ -66,8 +65,7 @@ func (ss *baseUserStream) SendMsg(m interface{}) error {
 		ss.opt.Logger.Error("sen msg error with msg = ", m)
 		return err
 	}
-	rspFrameData := ss.pkgHandler.Pkg2FrameData(replyData)
-	ss.stream.PutSend(rspFrameData, message.DataMsgType)
+	ss.stream.PutSend(replyData, message.DataMsgType)
 	return nil
 }
 
@@ -78,8 +76,7 @@ func (ss *baseUserStream) RecvMsg(m interface{}) error {
 	if readBuf.Buffer == nil {
 		return errors.Errorf("user stream closed!")
 	}
-	pkgData, _ := ss.pkgHandler.Frame2PkgData(readBuf.Bytes())
-	if err := ss.twoWayCodec.UnmarshalResponse(pkgData, m); err != nil {
+	if err := ss.twoWayCodec.UnmarshalResponse(readBuf.Bytes(), m); err != nil {
 		return err
 	}
 	return nil
@@ -90,11 +87,10 @@ type serverUserStream struct {
 	baseUserStream
 }
 
-func newServerUserStream(s Stream, serilizer common.TwoWayCodec, pkgHandler common.PackageHandler, opt *config.Option) *serverUserStream {
+func newServerUserStream(s Stream, serilizer common.TwoWayCodec, opt *config.Option) *serverUserStream {
 	return &serverUserStream{
 		baseUserStream: baseUserStream{
 			twoWayCodec: serilizer,
-			pkgHandler:  pkgHandler,
 			stream:      s,
 			opt:         opt,
 		},
@@ -123,11 +119,10 @@ func (ss *clientUserStream) CloseSend() error {
 }
 
 // nolint
-func NewClientUserStream(s Stream, serilizer common.TwoWayCodec, pkgHandler common.PackageHandler, opt *config.Option) *clientUserStream {
+func NewClientUserStream(s Stream, serilizer common.TwoWayCodec, opt *config.Option) *clientUserStream {
 	return &clientUserStream{
 		baseUserStream: baseUserStream{
 			twoWayCodec: serilizer,
-			pkgHandler:  pkgHandler,
 			stream:      s,
 			opt:         opt,
 		},

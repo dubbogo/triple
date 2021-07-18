@@ -28,6 +28,7 @@ import (
 )
 
 import (
+	"github.com/dubbogo/triple/internal/http2_handler"
 	"github.com/dubbogo/triple/internal/tools"
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
@@ -36,8 +37,9 @@ import (
 
 // TripleClient client endpoint that using triple protocol
 type TripleClient struct {
-	h2Controller *H2Controller
-	StubInvoker  reflect.Value
+	h2Controller *http2_handler.H2Controller
+
+	stubInvoker reflect.Value
 
 	//once is used when destroy
 	once sync.Once
@@ -55,42 +57,28 @@ type TripleClient struct {
 // @opt is used to init http2 controller, if it's nil, use the default config
 func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error) {
 	opt = tools.AddDefaultOption(opt)
-
-	tripleClient := &TripleClient{
-		opt: opt,
-	}
-	// start triple client connection,
-	if err := tripleClient.connect(opt); err != nil {
+	h2Controller, err := http2_handler.NewH2Controller(opt)
+	if err != nil {
+		opt.Logger.Errorf("NewH2Controller err = %v", err)
 		return nil, err
+	}
+	tripleClient := &TripleClient{
+		opt:          opt,
+		h2Controller: h2Controller,
 	}
 
 	// put dubbo3 network logic to tripleConn, creat pb stub invoker
 	if opt.CodecType == constant.PBCodecName {
-		tripleClient.StubInvoker = reflect.ValueOf(getInvoker(impl, newTripleConn(tripleClient)))
+		tripleClient.stubInvoker = reflect.ValueOf(getInvoker(impl, newTripleConn(tripleClient)))
 	}
 
 	return tripleClient, nil
 }
 
-// Connect called when new TripleClient, which start a tcp conn with target addr
-func (t *TripleClient) connect(opt *config.Option) error {
-	t.opt.Logger.Debugf("want to connect to location = ", opt.Location)
-
-	var err error
-	t.h2Controller, err = NewH2Controller(false, nil, t.opt)
-	if err != nil {
-		t.opt.Logger.Errorf("dubbo client new http2 controller error = %v", err)
-		return err
-	}
-	t.h2Controller.address = opt.Location
-
-	return nil
-}
-
 // Invoke call remote using stub
 func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply interface{}) error {
 	if t.opt.CodecType == constant.PBCodecName {
-		method := t.StubInvoker.MethodByName(methodName)
+		method := t.stubInvoker.MethodByName(methodName)
 		res := method.Call(in)
 		if res[1].IsValid() && res[1].Interface() != nil {
 			return res[1].Interface().(error)

@@ -18,28 +18,22 @@
 package triple
 
 import (
-	"io"
-	"net"
-	"net/http"
-	"runtime"
 	"sync"
-	"time"
 )
 
 import (
-	"github.com/dubbogo/net/http2"
-)
-
-import (
+	"github.com/dubbogo/triple/internal/http2_handler"
+	"github.com/dubbogo/triple/internal/path_matcher"
 	"github.com/dubbogo/triple/internal/tools"
 	"github.com/dubbogo/triple/pkg/config"
+	triHttp2 "github.com/dubbogo/triple/pkg/http2"
+	triHttp2Conf "github.com/dubbogo/triple/pkg/http2/config"
 )
 
 // TripleServer is the object that can be started and listening remote request
 type TripleServer struct {
-	lst           net.Listener
+	http2Server   *triHttp2.Http2Server
 	rpcServiceMap *sync.Map
-	h2Controller  *H2Controller
 	done          chan struct{}
 
 	// config
@@ -59,9 +53,7 @@ func NewTripleServer(serviceMap *sync.Map, opt *config.Option) *TripleServer {
 
 // Stop
 func (t *TripleServer) Stop() {
-	if t.h2Controller != nil {
-		t.h2Controller.Destroy()
-	}
+	t.http2Server.Stop()
 	t.done <- struct{}{}
 }
 
@@ -69,86 +61,21 @@ func (t *TripleServer) Stop() {
 func (t *TripleServer) Start() {
 	t.opt.Logger.Debug("tripleServer Start at ", t.opt.Location)
 
-	lst, err := net.Listen("tcp", t.opt.Location)
+	t.http2Server = triHttp2.NewHttp2Server(t.opt.Location, triHttp2Conf.ServerConfig{
+		Logger:             t.opt.Logger,
+		PathHandlerMatcher: path_matcher.NewDefaultPathHandlerMatcher(),
+	})
+
+	h2Handler, err := http2_handler.NewH2Controller(t.opt)
 	if err != nil {
-		panic(err)
+		t.opt.Logger.Error("new http2 controller failed with error = %v", err)
+		return
 	}
 
-	t.lst = lst
+	t.rpcServiceMap.Range(func(key, value interface{}) bool {
+		t.http2Server.RegisterHandler(key.(string), h2Handler.GetHandler(value))
+		return true
+	})
 
-	go t.run()
-}
-
-const (
-	// DefaultMaxSleepTime max sleep interval in accept
-	DefaultMaxSleepTime = 1 * time.Second
-	// DefaultListenerTimeout tcp listener timeout
-	DefaultListenerTimeout = 1.5e9
-)
-
-// run can start a loop to accept tcp conn
-func (t *TripleServer) run() {
-	var (
-		ok       bool
-		ne       net.Error
-		tmpDelay time.Duration
-	)
-
-	tl := t.lst.(*net.TCPListener)
-	for {
-		select {
-		case <-t.done:
-			return
-		default:
-		}
-
-		if tl != nil {
-			tl.SetDeadline(time.Now().Add(DefaultListenerTimeout))
-		}
-		c, err := t.lst.Accept()
-		if err != nil {
-			if ne, ok = err.(net.Error); ok && (ne.Temporary() || ne.Timeout()) {
-				if tmpDelay != 0 {
-					tmpDelay <<= 1
-				} else {
-					tmpDelay = 5 * time.Millisecond
-				}
-				if tmpDelay > DefaultMaxSleepTime {
-					tmpDelay = DefaultMaxSleepTime
-				}
-				time.Sleep(tmpDelay)
-				continue
-			}
-			return
-		}
-
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					const size = 64 << 10
-					buf := make([]byte, size)
-					buf = buf[:runtime.Stack(buf, false)]
-					t.opt.Logger.Errorf("http: panic serving %v: %v\n%s", c.RemoteAddr(), r, buf)
-					c.Close()
-				}
-			}()
-
-			if err := t.handleRawConn(c); err != nil && err != io.EOF {
-				t.opt.Logger.Error(" handle raw conn err = ", err)
-			}
-		}()
-	}
-}
-
-// handleRawConn create a H2 Controller to deal with new conn
-func (t *TripleServer) handleRawConn(conn net.Conn) error {
-	srv := &http2.Server{}
-	h2Controller, err := NewH2Controller(true, t.rpcServiceMap, t.opt)
-	if err != nil {
-		return err
-	}
-	t.h2Controller = h2Controller
-	opts := &http2.ServeConnOpts{Handler: http.HandlerFunc(h2Controller.GetHandler())}
-	srv.ServeConn(conn, opts)
-	return nil
+	t.http2Server.Start()
 }
