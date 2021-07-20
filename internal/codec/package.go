@@ -35,7 +35,7 @@ func init() {
 type TriplePackageHandler struct {
 }
 
-// Frame2PkgData/Pkg2FrameData is not as useless!
+// Frame2PkgData is not useless
 // We use it to get raw data from http2 golang package,
 func (t *TriplePackageHandler) Frame2PkgData(frameData []byte) ([]byte, uint32) {
 	if len(frameData) < 5 {
@@ -60,7 +60,7 @@ func (t *TriplePackageHandler) Pkg2FrameData(pkgData []byte) []byte {
 	return rsp
 }
 
-// NewTriplePkgHandler
+// NewTriplePkgHandler create TriplePackageHandler instance
 func NewTriplePkgHandler() common.PackageHandler {
 	return &TriplePackageHandler{}
 }

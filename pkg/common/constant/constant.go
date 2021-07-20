@@ -32,7 +32,6 @@ const (
 	DefaultListeningAddress = "127.0.0.1:20001"
 )
 
-// serializer
 // CodecType is the type of triple serializer
 type CodecType string
 
@@ -47,7 +46,7 @@ const (
 	MsgPackCodecName = CodecType("msgpack")
 )
 
-// context key
+// TripleCtxKey is typ of content key
 type TripleCtxKey string
 
 const (
@@ -68,14 +67,16 @@ const (
 	// TrailerKeyTraceProtoBin is triple trailer header
 	TrailerKeyTraceProtoBin = "trace-proto-bin"
 
-	// TrailerKeyHttp2Success is http2 pkg trailer key of success
+	// TrailerKeyHttp2Status is http2 pkg trailer key of success
 	TrailerKeyHttp2Status = "http2-status"
 
 	// TrailerKeyHttp2Message is http2 pkg trailer key of error message
 	TrailerKeyHttp2Message = "http2-message"
 )
 
+// Header keys are header field key from client
 const (
+	TripleContentType    = "application/grpc+proto"
 	TripleUserAgent      = "grpc-go/1.35.0-dev"
 	TripleServiceVersion = "tri-service-version"
 	TripleServiceGroup   = "tri-service-group"

@@ -35,27 +35,22 @@ type Message struct {
 	Err     error // todo delete it, all change to status
 }
 
-// nolint
 func (bm *Message) Read(p []byte) (int, error) {
 	return bm.Buffer.Read(p)
 }
 
-// nolint
 func (bm *Message) Bytes() []byte {
 	return bm.Buffer.Bytes()
 }
 
-// nolint
 func (bm *Message) Write(data []byte) {
 	bm.Buffer.Write(data)
 }
 
-// nolint
 func (bm *Message) Reset() {
 	bm.Buffer.Reset()
 }
 
-// nolint
 func (bm *Message) Len() int {
 	return bm.Buffer.Len()
 }
@@ -85,12 +80,10 @@ func (b *MsgChain) Put(r Message) {
 	}
 }
 
-// nolint
 func (b *MsgChain) Get() <-chan Message {
 	return b.c
 }
 
-// nolint
 func (b *MsgChain) Close() {
 	close(b.c)
 }

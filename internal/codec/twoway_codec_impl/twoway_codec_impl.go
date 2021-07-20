@@ -37,7 +37,7 @@ func NewTwoWayCodec(codecName constant.CodecType) (common.TwoWayCodec, error) {
 	}
 }
 
-// PBWrapperTwoWayCodec
+// PBWrapperTwoWayCodec is codec impl of pb
 type PBWrapperTwoWayCodec struct {
 	codecName constant.CodecType
 	pbCodec   common.Codec
@@ -46,7 +46,7 @@ type PBWrapperTwoWayCodec struct {
 
 // NewPBWrapperTwoWayCodec new common.TwoWayCodec PBWrapperTwoWayCodec with @codecName defined Codec inside
 func NewPBWrapperTwoWayCodec(codecName constant.CodecType) (common.TwoWayCodec, error) {
-	codec, err := common.GetTripleCodec(codecName)
+	tripleCodec, err := common.GetTripleCodec(codecName)
 	if err != nil {
 		return nil, err
 	}
@@ -55,13 +55,13 @@ func NewPBWrapperTwoWayCodec(codecName constant.CodecType) (common.TwoWayCodec, 
 		return nil, err
 	}
 	return &PBWrapperTwoWayCodec{
-		codec:     codec,
+		codec:     tripleCodec,
 		codecName: codecName,
 		pbCodec:   pbCodec,
 	}, err
 }
 
-// MarshalRequest
+// MarshalRequest marshal interface @v to []byte
 func (h *PBWrapperTwoWayCodec) MarshalRequest(v interface{}) ([]byte, error) {
 	argsBytes := make([][]byte, 0)
 	argsTypes := make([]string, 0)
@@ -80,7 +80,7 @@ func (h *PBWrapperTwoWayCodec) MarshalRequest(v interface{}) ([]byte, error) {
 	return h.pbCodec.Marshal(wrapperRequest)
 }
 
-// UnmarshalRequest
+// UnmarshalRequest unmarshal bytes @data to interface
 func (h *PBWrapperTwoWayCodec) UnmarshalRequest(data []byte, v interface{}) error {
 	wrapperRequest := proto2.TripleRequestWrapper{}
 	err := h.pbCodec.Unmarshal(data, &wrapperRequest)
@@ -96,7 +96,7 @@ func (h *PBWrapperTwoWayCodec) UnmarshalRequest(data []byte, v interface{}) erro
 	return nil
 }
 
-// MarshalResponse
+// MarshalResponse marshal interface @v to []byte
 func (h *PBWrapperTwoWayCodec) MarshalResponse(v interface{}) ([]byte, error) {
 	data, err := h.codec.Marshal(v)
 	if err != nil {
@@ -111,7 +111,7 @@ func (h *PBWrapperTwoWayCodec) MarshalResponse(v interface{}) ([]byte, error) {
 	return h.pbCodec.Marshal(wrapperRequest)
 }
 
-// UnmarshalResponse
+// UnmarshalResponse unmarshal bytes @data to interface
 func (h *PBWrapperTwoWayCodec) UnmarshalResponse(data []byte, v interface{}) error {
 	wrapperResponse := proto2.TripleResponseWrapper{}
 	err := h.pbCodec.Unmarshal(data, &wrapperResponse)
@@ -121,34 +121,34 @@ func (h *PBWrapperTwoWayCodec) UnmarshalResponse(data []byte, v interface{}) err
 	return h.codec.Unmarshal(wrapperResponse.Data, v)
 }
 
-// PBWrapperTwoWayCodec
+// PBTwoWayCodec is pb impl of TwoWayCodec
 type PBTwoWayCodec struct {
 	codec common.Codec
 }
 
-// NewPBTwoWayCodec
+// NewPBTwoWayCodec new PBTwoWayCodec instance
 func NewPBTwoWayCodec() common.TwoWayCodec {
 	return &PBTwoWayCodec{
 		codec: codec_impl.NewProtobufCodec(),
 	}
 }
 
-// MarshalRequest
+// MarshalRequest marshal interface @v to []byte
 func (h *PBTwoWayCodec) MarshalRequest(v interface{}) ([]byte, error) {
 	return h.codec.Marshal(v)
 }
 
-// UnmarshalRequest
+// UnmarshalRequest unmarshal bytes @data to interface
 func (h *PBTwoWayCodec) UnmarshalRequest(data []byte, v interface{}) error {
 	return h.codec.Unmarshal(data, v)
 }
 
-// MarshalResponse
+// MarshalResponse marshal interface @v to []byte
 func (h *PBTwoWayCodec) MarshalResponse(v interface{}) ([]byte, error) {
 	return h.codec.Marshal(v)
 }
 
-// UnmarshalResponse
+// UnmarshalResponse unmarshal bytes @data to interface
 func (h *PBTwoWayCodec) UnmarshalResponse(data []byte, v interface{}) error {
 	return h.codec.Unmarshal(data, v)
 }

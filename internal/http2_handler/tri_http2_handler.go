@@ -42,7 +42,7 @@ import (
 	"github.com/dubbogo/triple/pkg/common/constant"
 	"github.com/dubbogo/triple/pkg/config"
 	"github.com/dubbogo/triple/pkg/http2"
-	http2_config "github.com/dubbogo/triple/pkg/http2/config"
+	http2Config "github.com/dubbogo/triple/pkg/http2/config"
 )
 
 // H2Controller is used by dubbo3 client/server, to call http2
@@ -286,7 +286,7 @@ func (hc *H2Controller) StreamInvoke(ctx context.Context, path string) (grpc.Cli
 	}()
 	headerHandler, _ := common.GetProtocolHeaderHandler(hc.option, ctx)
 	newHeader := headerHandler.WriteTripleReqHeaderField(http.Header{})
-	dataChan, rspHeaderChan, err := hc.http2Client.StreamPost(hc.address, path, sendStreamChan, &http2_config.PostConfig{
+	dataChan, rspHeaderChan, err := hc.http2Client.StreamPost(hc.address, path, sendStreamChan, &http2Config.PostConfig{
 		ContentType: "application/grpc+proto",
 		BufferSize:  4096,
 		Timeout:     3,
@@ -336,8 +336,8 @@ func (hc *H2Controller) UnaryInvoke(ctx context.Context, path string, arg, reply
 	newHeader := http.Header{}
 	newHeader = headerHandler.WriteTripleReqHeaderField(newHeader)
 
-	rspData, rspTrailerHeader, err := hc.http2Client.Post(hc.address, path, sendData, &http2_config.PostConfig{
-		ContentType: "application",
+	rspData, rspTrailerHeader, err := hc.http2Client.Post(hc.address, path, sendData, &http2Config.PostConfig{
+		ContentType: constant.TripleContentType,
 		BufferSize:  4096,
 		Timeout:     3,
 		HeaderField: newHeader,
