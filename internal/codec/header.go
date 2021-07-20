@@ -166,7 +166,7 @@ func getCtxVaSave(ctx context.Context, field string) string {
 	return ""
 }
 
-// ReadFromH2MetaHeader read meta header field from h2 header, and parse it to ProtocolHeader as developer defined
+// ReadFromTripleReqHeader read meta header field from h2 header, and parse it to ProtocolHeader as developer defined
 func (t *TripleHeaderHandler) ReadFromTripleReqHeader(r *http.Request) h2Triple.ProtocolHeader {
 	tripleHeader := &TripleHeader{}
 	header := r.Header

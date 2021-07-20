@@ -57,11 +57,11 @@ func (ihh *ImplProtocolHeaderHandler) ReadFromTripleReqHeader(header *http.Reque
 	return &ImplProtocolHeader{}
 }
 
-func (hh *ImplProtocolHeaderHandler) WriteTripleReqHeaderField(header http.Header) http.Header {
+func (ihh *ImplProtocolHeaderHandler) WriteTripleReqHeaderField(header http.Header) http.Header {
 	return nil
 }
 
-func (hh *ImplProtocolHeaderHandler) WriteTripleFinalRspHeaderField(w http.ResponseWriter, grpcStatusCode int, grpcMessage string, traceProtoBin int) {
+func (ihh *ImplProtocolHeaderHandler) WriteTripleFinalRspHeaderField(w http.ResponseWriter, grpcStatusCode int, grpcMessage string, traceProtoBin int) {
 
 }
 

@@ -30,7 +30,7 @@ type TripleGrpcService interface {
 	ServiceDesc() *grpc.ServiceDesc
 }
 
-// nolint
+// TripleUnaryService is normal protocol service (except grpc service), should be implemented by users
 type TripleUnaryService interface {
 	InvokeWithArgs(ctx context.Context, methodName string, arguments []interface{}) (interface{}, error)
 	GetReqParamsInteface(methodName string) (interface{}, bool)
