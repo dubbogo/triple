@@ -23,7 +23,7 @@ import (
 
 import (
 	"github.com/dubbogo/triple/internal/http2_handler"
-	"github.com/dubbogo/triple/internal/path_matcher"
+	"github.com/dubbogo/triple/internal/path"
 	"github.com/dubbogo/triple/internal/tools"
 	"github.com/dubbogo/triple/pkg/config"
 	triHttp2 "github.com/dubbogo/triple/pkg/http2"
@@ -62,8 +62,8 @@ func (t *TripleServer) Start() {
 	t.opt.Logger.Debug("tripleServer Start at ", t.opt.Location)
 
 	t.http2Server = triHttp2.NewHttp2Server(t.opt.Location, triHttp2Conf.ServerConfig{
-		Logger:             t.opt.Logger,
-		PathHandlerMatcher: path_matcher.NewDefaultPathHandlerMatcher(),
+		Logger:        t.opt.Logger,
+		PathExtractor: path.NewDefaultExtractor(),
 	})
 
 	h2Handler, err := http2_handler.NewH2Controller(t.opt)

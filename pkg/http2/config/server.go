@@ -6,6 +6,6 @@ import (
 )
 
 type ServerConfig struct {
-	Logger             logger.Logger
-	PathHandlerMatcher common.PathHandlerMatcher
+	Logger        logger.Logger
+	PathExtractor common.PathExtractor
 }
