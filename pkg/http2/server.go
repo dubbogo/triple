@@ -247,7 +247,7 @@ func (h *Http2Server) http2HandleFunction(wi http.ResponseWriter, r *http.Reques
 		}
 	}()
 
-	if handlerName, err := h.pathExtractor.InterfaceName(path); err == nil {
+	if handlerName, err := h.pathExtractor.InterfaceKey(path); err == nil {
 		if v, ok := h.httpHandlerMap[handlerName]; ok {
 			handler = v
 		}
@@ -328,6 +328,6 @@ func WriteTripleFinalRspHeaderField(w *http2.Http2ResponseWriter, trailer http.H
 type defaultPathExtractor struct {
 }
 
-func (e *defaultPathExtractor) InterfaceName(path string) (string, error) {
+func (e *defaultPathExtractor) InterfaceKey(path string) (string, error) {
 	return path, nil
 }

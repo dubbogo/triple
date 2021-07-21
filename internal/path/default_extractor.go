@@ -7,7 +7,7 @@ import (
 
 type DefaultExtractor struct{}
 
-func (e *DefaultExtractor) InterfaceName(path string) (string, error) {
+func (e *DefaultExtractor) InterfaceKey(path string) (string, error) {
 	interfaceKey, _, err := tools.GetServiceKeyAndUpperCaseMethodNameFromPath(path)
 	if err != nil {
 		return "", err
