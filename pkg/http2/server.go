@@ -29,14 +29,14 @@ type Http2Handler func(path string, header http.Header, recvChan chan *bytes.Buf
 
 // TripleServer is the object that can be started and listening remote request
 type Http2Server struct {
-	lst                net.Listener
-	lock               sync.Mutex
-	httpHandlerMap     map[string]Http2Handler
-	done               chan struct{}
-	address            string
-	logger             logger.Logger
-	frameHandler       common.PackageHandler
-	pathHandlerMatcher common.PathHandlerMatcher
+	lst            net.Listener
+	lock           sync.Mutex
+	httpHandlerMap map[string]Http2Handler
+	done           chan struct{}
+	address        string
+	logger         logger.Logger
+	frameHandler   common.PackageHandler
+	pathExtractor  common.PathExtractor
 }
 
 // NewHttp2Server
@@ -46,18 +46,18 @@ func NewHttp2Server(address string, conf tConfig.ServerConfig) *Http2Server {
 		panic(err)
 	}
 
-	pathHandlerMatcher := conf.PathHandlerMatcher
-	if pathHandlerMatcher == nil {
-		pathHandlerMatcher = &defaultPathHandlerMatcher{}
+	pathExtractor := conf.PathExtractor
+	if pathExtractor == nil {
+		pathExtractor = &defaultPathExtractor{}
 	}
 	return &Http2Server{
-		frameHandler:       headerHandler,
-		address:            address,
-		logger:             conf.Logger,
-		done:               make(chan struct{}),
-		httpHandlerMap:     make(map[string]Http2Handler),
-		pathHandlerMatcher: pathHandlerMatcher,
-		lock:               sync.Mutex{},
+		frameHandler:   headerHandler,
+		address:        address,
+		logger:         conf.Logger,
+		done:           make(chan struct{}),
+		httpHandlerMap: make(map[string]Http2Handler),
+		pathExtractor:  pathExtractor,
+		lock:           sync.Mutex{},
 	}
 }
 
@@ -247,11 +247,12 @@ func (h *Http2Server) http2HandleFunction(wi http.ResponseWriter, r *http.Reques
 		}
 	}()
 
-	for k, v := range h.httpHandlerMap {
-		if h.pathHandlerMatcher.Match(path, k) {
+	if handlerName, err := h.pathExtractor.InterfaceName(path); err == nil {
+		if v, ok := h.httpHandlerMap[handlerName]; ok {
 			handler = v
 		}
 	}
+
 	if handler == nil {
 		//todo add error handler interface, let user define their handler
 		err := perrors.Errorf("request path = %s, which is not match any handler", path)
@@ -324,9 +325,9 @@ func WriteTripleFinalRspHeaderField(w *http2.Http2ResponseWriter, trailer http.H
 	}
 }
 
-type defaultPathHandlerMatcher struct {
+type defaultPathExtractor struct {
 }
 
-func (d *defaultPathHandlerMatcher) Match(path string, rule string) bool {
-	return path == rule
+func (e *defaultPathExtractor) InterfaceName(path string) (string, error) {
+	return path, nil
 }
