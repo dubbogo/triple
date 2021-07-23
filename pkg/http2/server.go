@@ -25,8 +25,8 @@ import (
 	tConfig "github.com/dubbogo/triple/pkg/http2/config"
 )
 
-// Http2Handler uses to relay data to upper layer and receive data from upper layer as well.
-// recvChan relays body data to upper layer, see also readChan defined in http2HandleFunction()
+// Http2Handler relays data to upper layer and receives data from upper layer as well.
+// recvChan relays data from lower layer to upper layer, generally lower layer refers to http body data
 // sendChan receives response sent from upper layer
 // ctrlChan receives response header sent from upper layer
 // errChan receives errors sent from upper layer
