@@ -25,7 +25,12 @@ import (
 	tConfig "github.com/dubbogo/triple/pkg/http2/config"
 )
 
-type Http2Handler func(path string, header http.Header, recvChan chan *bytes.Buffer, sendChan chan *bytes.Buffer, ctrlch chan http.Header, errCh chan interface{})
+// Http2Handler relays data to upper layer and receives data from upper layer as well.
+// recvChan relays data from lower layer to upper layer, generally lower layer refers to http body data
+// sendChan receives response sent from upper layer
+// ctrlChan receives response header sent from upper layer
+// errChan receives errors sent from upper layer
+type Http2Handler func(path string, header http.Header, recvChan chan *bytes.Buffer, sendChan chan *bytes.Buffer, ctrlChan chan http.Header, errChan chan interface{})
 
 // TripleServer is the object that can be started and listening remote request
 type Http2Server struct {
@@ -68,25 +73,25 @@ func (s *Http2Server) RegisterHandler(path string, handler Http2Handler) {
 }
 
 // Stop
-func (t *Http2Server) Stop() {
-	//if t.h2Controller != nil {
-	//	t.h2Controller.Destroy()
+func (s *Http2Server) Stop() {
+	//if s.h2Controller != nil {
+	//	s.h2Controller.Destroy()
 	//}
-	close(t.done)
+	close(s.done)
 }
 
 // Start can start a triple server
-func (t *Http2Server) Start() {
-	t.logger.Debug("tripleServer Start at ", t.address)
+func (s *Http2Server) Start() {
+	s.logger.Debug("tripleServer Start at ", s.address)
 
-	lst, err := net.Listen("tcp", t.address)
+	lst, err := net.Listen("tcp", s.address)
 	if err != nil {
 		panic(err)
 	}
 
-	t.lst = lst
+	s.lst = lst
 
-	go t.run()
+	go s.run()
 }
 
 const (
@@ -97,17 +102,17 @@ const (
 )
 
 // run can start a loop to accept tcp conn
-func (t *Http2Server) run() {
+func (s *Http2Server) run() {
 	var (
 		ok       bool
 		ne       net.Error
 		tmpDelay time.Duration
 	)
 
-	tl := t.lst.(*net.TCPListener)
+	tl := s.lst.(*net.TCPListener)
 	for {
 		select {
-		case <-t.done:
+		case <-s.done:
 			return
 		default:
 		}
@@ -115,7 +120,7 @@ func (t *Http2Server) run() {
 		if tl != nil {
 			tl.SetDeadline(time.Now().Add(DefaultListenerTimeout))
 		}
-		c, err := t.lst.Accept()
+		c, err := s.lst.Accept()
 		if err != nil {
 			if ne, ok = err.(net.Error); ok && (ne.Temporary() || ne.Timeout()) {
 				if tmpDelay != 0 {
@@ -138,22 +143,22 @@ func (t *Http2Server) run() {
 					const size = 64 << 10
 					buf := make([]byte, size)
 					buf = buf[:runtime.Stack(buf, false)]
-					t.logger.Errorf("http: panic serving %v: %v\n%s", c.RemoteAddr(), r, buf)
+					s.logger.Errorf("http: panic serving %v: %v\n%s", c.RemoteAddr(), r, buf)
 					c.Close()
 				}
 			}()
 
-			if err := t.handleRawConn(c); err != nil && err != io.EOF {
-				t.logger.Error(" handle raw conn err = ", err)
+			if err := s.handleRawConn(c); err != nil && err != io.EOF {
+				s.logger.Error(" handle raw conn err = ", err)
 			}
 		}()
 	}
 }
 
 // handleRawConn create a H2 Controller to deal with new conn
-func (t *Http2Server) handleRawConn(conn net.Conn) error {
+func (s *Http2Server) handleRawConn(conn net.Conn) error {
 	srv := &http2.Server{}
-	opts := &http2.ServeConnOpts{Handler: http.HandlerFunc(t.http2HandleFunction)}
+	opts := &http2.ServeConnOpts{Handler: http.HandlerFunc(s.http2HandleFunction)}
 	srv.ServeConn(conn, opts)
 	return nil
 }
@@ -223,7 +228,7 @@ func readSplitData(rBody io.ReadCloser) chan *bytes.Buffer {
 	return cbm
 }
 
-func (h *Http2Server) http2HandleFunction(wi http.ResponseWriter, r *http.Request) {
+func (s *Http2Server) http2HandleFunction(wi http.ResponseWriter, r *http.Request) {
 	w := wi.(*http2.Http2ResponseWriter)
 	path := r.URL.Path
 	headerField := r.Header
@@ -231,14 +236,16 @@ func (h *Http2Server) http2HandleFunction(wi http.ResponseWriter, r *http.Reques
 	recvChan := make(chan *bytes.Buffer)
 	ctrlChan := make(chan http.Header)
 	errChan := make(chan interface{})
+	// body data from http
 	readChan := readSplitData(r.Body)
 	var handler Http2Handler
 	go func() {
 		for {
 			select {
 			// todo close read
-			case msgData := <-readChan:
-				if msgData == nil {
+			// put body data to recvChan
+			case msgData, ok := <-readChan:
+				if !ok {
 					close(recvChan)
 					return
 				}
@@ -247,8 +254,9 @@ func (h *Http2Server) http2HandleFunction(wi http.ResponseWriter, r *http.Reques
 		}
 	}()
 
-	if handlerName, err := h.pathExtractor.HttpHandlerKey(path); err == nil {
-		if v, ok := h.httpHandlerMap[handlerName]; ok {
+	// select a http handler according to the path
+	if handlerName, err := s.pathExtractor.HttpHandlerKey(path); err == nil {
+		if v, ok := s.httpHandlerMap[handlerName]; ok {
 			handler = v
 		}
 	}
@@ -256,10 +264,10 @@ func (h *Http2Server) http2HandleFunction(wi http.ResponseWriter, r *http.Reques
 	if handler == nil {
 		//todo add error handler interface, let user define their handler
 		err := perrors.Errorf("request path = %s, which is not match any handler", path)
-		h.logger.Warn(err)
+		s.logger.Warn(err)
 		w.WriteHeader(400)
 		if _, err2 := w.Write([]byte(err.Error())); err2 != nil {
-			h.logger.Errorf("write back rsp error message %s, with err = %v", err.Error(), err2)
+			s.logger.Errorf("write back rsp error message %s, with err = %v", err.Error(), err2)
 		}
 		return
 	}
@@ -285,6 +293,7 @@ func (h *Http2Server) http2HandleFunction(wi http.ResponseWriter, r *http.Reques
 	w.FlushHeader()
 	success := true
 	errorMsg := ""
+
 LOOP:
 	for {
 		select {
@@ -293,13 +302,13 @@ LOOP:
 			success = false
 			errorMsg = err.(error).Error()
 			break LOOP
-		case sendMsg := <-sendChan:
-			if sendMsg == nil { // sendChanClose
+		case sendMsg, ok := <-sendChan:
+			if !ok { // sendChanClose
 				break LOOP
 			}
-			sendData := h.frameHandler.Pkg2FrameData(sendMsg.Bytes())
+			sendData := s.frameHandler.Pkg2FrameData(sendMsg.Bytes())
 			if _, err := w.Write(sendData); err != nil {
-				h.logger.Errorf(" receiving response from upper proxy invoker error = %v", err)
+				s.logger.Errorf(" receiving response from upper proxy invoker error = %v", err)
 			}
 			w.Flush()
 		}
