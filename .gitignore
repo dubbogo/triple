@@ -21,6 +21,9 @@
 # vendor/
 
 # >>>>> Java
+build
+target
+!example/build
 # Compiled class file
 *.class
 

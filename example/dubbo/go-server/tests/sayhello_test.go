@@ -24,7 +24,7 @@ func TestSayHello(t *testing.T) {
 	err := greeterProvider.SayHello(ctx, &req, &user)
 	assert.Nil(t, err)
 
-	assert.Equal(t, "Hello laurence", user.Name)
+	assert.Equal(t, "laurence", user.Name)
 	assert.Equal(t, "12345", user.Id)
 	assert.Equal(t, int32(21), user.Age)
 

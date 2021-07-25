@@ -17,6 +17,7 @@ PROJECT_NAME = $(shell basename "$(PWD)")
 PID = /tmp/.$(PROJECT_NAME).pid
 PROJECT_DIR=$(shell pwd)
 BASE_DIR := $(PROJECT_DIR)/dist
+JAVA_SERVER_DIR=""
 
 
 SOURCES = $(wildcard $(PROJECT_DIR)/cmd/*.go)
@@ -26,7 +27,8 @@ export GOPROXY ?= https://goproxy.io,direct
 export GOSUMDB ?= sum.golang.org
 export GOARCH ?= amd64
 
-export DOCKER_HOST_IP = $(shell ifconfig en0 | grep inet | grep -v inet6 | awk '{print $$2}')
+# get local ip, tested on Debian 10.0
+export DOCKER_HOST_IP = $(shell hostname -I | awk '{print $1}')
 
 OS := $(shell uname)
 ifeq ($(OS), Linux)
@@ -126,6 +128,18 @@ start: build
 print-server-log:
 	$(info   >  print server log with $(LOG_FILE))
 	@-cat $(LOG_FILE)
+	@-rm -f $(LOG_FILE)
+
+## start: Start the java application (for server)
+.PHONY: start-java
+start-java: $(info   >  Starting java application $(PROJECT_NAME), output is redirected to $(LOG_FILE))
+	@mkdir -p $(OUT_DIR)
+	@chmod +x $(PROJECT_DIR)/run.sh
+	@-$(PROJECT_DIR)/run.sh $(PROJECT_DIR) > $(LOG_FILE) 2>&1 & echo $$! > $(PID)
+	@cat $(PID) | sed "/^/s/^/  \>  PID: /"
+	# wait for java-server launching
+	@chmod +x $(shell pwd)/waiting_launch.sh
+	@$(shell pwd)/waiting_launch.sh $(LOG_FILE)
 
 ## run: Run the application (for client)
 .PHONY: run
