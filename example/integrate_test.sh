@@ -58,7 +58,7 @@ if [ -e $JAVA_SERVER_SHELL ]; then
   fi
 
   # stop server
-  make PROJECT_DIR=$JAVA_SERVER_SHELL PROJECT_NAME=$(basename $JAVA_SERVER_SHELL) BASE_DIR=$JAVA_SERVER_SHELL/dist -f build/Makefile clean
+  make PROJECT_DIR=$JAVA_SERVER_SHELL PROJECT_NAME=$(basename $JAVA_SERVER_SHELL) BASE_DIR=$JAVA_SERVER_SHELL/dist -f build/Makefile clean-java
 fi
 
 make PROJECT_DIR=$P_DIR PROJECT_NAME=$(basename $P_DIR) BASE_DIR=$P_DIR/dist -f build/Makefile docker-down

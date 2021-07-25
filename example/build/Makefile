@@ -130,7 +130,7 @@ print-server-log:
 	@-cat $(LOG_FILE)
 	@-rm -f $(LOG_FILE)
 
-## start: Start the java application (for server)
+## start-java: Start the java application (for server)
 .PHONY: start-java
 start-java: $(info   >  Starting java application $(PROJECT_NAME), output is redirected to $(LOG_FILE))
 	@mkdir -p $(OUT_DIR)
@@ -158,6 +158,13 @@ stop:
 	$(info   >  Stopping the application $(PROJECT_NAME))
 	@cat $(PID) | sed "/^/s/^/  \>  Killing PID: /"
 	@-kill `cat $(PID)` 2>/dev/null || true
+
+## clean-java
+.PHONY: clean-java
+clean-java: clean
+	$(info   >  Cleanning up $(OUT_DIR))
+	kill -15 $(shell ps -ef | grep "java-server" | grep -v grep | awk '{print $$2}')
+	@-rm -rf $(OUT_DIR)
 
 ## integration: Run integration test for this application
 .PHONY: integration
