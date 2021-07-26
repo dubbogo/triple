@@ -17,6 +17,8 @@ do
     exit
   fi
   echo "waiting... log file md5: $MD5"
-  cat $1
   PREV_MD5=$MD5
 done
+
+echo "java-server is not launched properly, the launching log will be outputted at below: "
+cat $1
