@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "org.apache.dubbo";
+option java_outer_classname = "HelloWorldProto";
+option objc_class_prefix = "DEMOSRV";
+option go_package = "./;pkg";
+
+package main;
+
+// The greeting service definition.
+service Greeter {
+  // Sends a greeting
+  rpc SayHelloStream (stream HelloRequest) returns (stream User) {}
+  rpc SayHello(HelloRequest) returns (User) {}
+}
+
+// The request message containing the user's name.
+message HelloRequest {
+  string name = 1;
+}
+
+// The response message containing the greetings
+message User {
+  string name = 1;
+  string id = 2;
+  int32 age = 3;
+}

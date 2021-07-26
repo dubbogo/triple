@@ -19,4 +19,4 @@ references:
   "greeterImpl": # reference key must match service key in server.yml
     registry: "demoZk"
     protocol: "tri"
-    interface: "protobuf.Greeter"
+    interface: "org.apache.dubbo.IGreeter"
