@@ -163,7 +163,7 @@ stop:
 .PHONY: clean-java
 clean-java: clean
 	$(info   >  Cleanning up $(OUT_DIR))
-	kill -15 $(shell ps -ef | grep "java-server" | grep -v grep | awk '{print $$2}')
+	kill -15 $(shell ps -ef | grep -P "Dmaven.*java-server" | grep -v grep | awk '{print $$2}')
 	@-rm -rf $(OUT_DIR)
 
 ## integration: Run integration test for this application
