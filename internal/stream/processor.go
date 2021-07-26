@@ -40,7 +40,7 @@ import (
 )
 
 // processor is the interface, with func runRPC and close
-// it process server RPC method that user defined and get response
+// It processes server RPC method that user defined and get response
 type processor interface {
 	runRPC()
 	close()
@@ -217,9 +217,9 @@ func newStreamingProcessor(s *serverStream, desc grpc.StreamDesc, serializer com
 
 // runRPC called by stream
 func (sp *streamingProcessor) runRPC() {
-	serverUserstream := newServerUserStream(sp.stream, sp.twoWayCodec, sp.opt)
+	serverUserStream := newServerUserStream(sp.stream, sp.twoWayCodec, sp.opt)
 	go func() {
-		if err := sp.streamDesc.Handler(sp.stream.getService(), serverUserstream); err != nil {
+		if err := sp.streamDesc.Handler(sp.stream.getService(), serverUserStream); err != nil {
 			sp.handleRPCErr(err)
 			return
 		}

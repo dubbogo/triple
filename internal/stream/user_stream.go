@@ -32,7 +32,7 @@ import (
 	"github.com/dubbogo/triple/pkg/config"
 )
 
-// baseUserStream is the base userstream impl
+// baseUserStream converts data between user data(interface{}) and []byte with the help of twoWayCodec
 type baseUserStream struct {
 	opt         *config.Option
 	stream      Stream
@@ -62,7 +62,7 @@ func (ss *baseUserStream) Context() context.Context {
 func (ss *baseUserStream) SendMsg(m interface{}) error {
 	replyData, err := ss.twoWayCodec.MarshalRequest(m)
 	if err != nil {
-		ss.opt.Logger.Error("sen msg error with msg = ", m)
+		ss.opt.Logger.Error("send msg error with msg = ", m)
 		return err
 	}
 	ss.stream.PutSend(replyData, message.DataMsgType)
@@ -72,8 +72,8 @@ func (ss *baseUserStream) SendMsg(m interface{}) error {
 // nolint
 func (ss *baseUserStream) RecvMsg(m interface{}) error {
 	recvChan := ss.stream.GetRecv()
-	readBuf := <-recvChan
-	if readBuf.Buffer == nil {
+	readBuf, ok := <-recvChan
+	if !ok {
 		return errors.Errorf("user stream closed!")
 	}
 	if err := ss.twoWayCodec.UnmarshalResponse(readBuf.Bytes(), m); err != nil {
@@ -82,15 +82,15 @@ func (ss *baseUserStream) RecvMsg(m interface{}) error {
 	return nil
 }
 
-// serverUserStream can be throw to grpc, and let grpc use it
+// serverUserStream can be thrown to grpc, and let grpc use it
 type serverUserStream struct {
 	baseUserStream
 }
 
-func newServerUserStream(s Stream, serilizer common.TwoWayCodec, opt *config.Option) *serverUserStream {
+func newServerUserStream(s Stream, serializer common.TwoWayCodec, opt *config.Option) *serverUserStream {
 	return &serverUserStream{
 		baseUserStream: baseUserStream{
-			twoWayCodec: serilizer,
+			twoWayCodec: serializer,
 			stream:      s,
 			opt:         opt,
 		},

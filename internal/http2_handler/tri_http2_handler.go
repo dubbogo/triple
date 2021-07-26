@@ -159,8 +159,8 @@ func (hc *H2Controller) GetHandler(rpcService interface{}) http2.Http2Handler {
 
 // getMethodAndStreamDescMap get unary method desc map and stream method desc map from dubbo3 stub
 func getMethodAndStreamDescMap(ds common.TripleGrpcService) (map[string]grpc.MethodDesc, map[string]grpc.StreamDesc, error) {
-	sdMap := make(map[string]grpc.MethodDesc, 8)
-	strMap := make(map[string]grpc.StreamDesc, 8)
+	sdMap := make(map[string]grpc.MethodDesc, len(ds.ServiceDesc().Methods))
+	strMap := make(map[string]grpc.StreamDesc, len(ds.ServiceDesc().Streams))
 	for _, v := range ds.ServiceDesc().Methods {
 		sdMap[v.MethodName] = v
 	}

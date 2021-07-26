@@ -60,31 +60,31 @@ func (bm *Message) GetMsgType() MsgType {
 	return bm.MsgType
 }
 
-// MsgChain contain the chan of Message
-type MsgChain struct {
+// MsgChan contain the chan of Message
+type MsgChan struct {
 	c chan Message
 }
 
-// NewBufferMsgChain returns new MsgChain
-func NewBufferMsgChain() *MsgChain {
-	b := &MsgChain{
+// NewBufferMsgChain returns new MsgChan
+func NewBufferMsgChain() *MsgChan {
+	b := &MsgChan{
 		c: make(chan Message),
 	}
 	return b
 }
 
 // Put if stream close by force, the Put function doesn't send anything.
-func (b *MsgChain) Put(r Message) {
+func (b *MsgChan) Put(r Message) {
 	if b.c != nil {
 		b.c <- r
 	}
 }
 
-func (b *MsgChain) Get() <-chan Message {
+func (b *MsgChan) Get() <-chan Message {
 	return b.c
 }
 
-func (b *MsgChain) Close() {
+func (b *MsgChan) Close() {
 	close(b.c)
 }
 
