@@ -6,7 +6,8 @@ fi
 PREV_MD5=""
 MD5=""
 
-while true
+# wait 150s maximum
+for ((i=1; i<=15; i++))
 do
   sleep 10s
   MD5=$(md5sum $1 | cut -d ' ' -f1)
@@ -14,5 +15,6 @@ do
     exit
   fi
   echo "waiting... log file md5: $MD5"
+  cat $1
   PREV_MD5=$MD5
 done
