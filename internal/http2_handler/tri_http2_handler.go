@@ -61,7 +61,7 @@ type H2Controller struct {
 	// option is 10M by default
 	option *config.Option
 
-	twowayCodec common.TwoWayCodec
+	twoWayCodec common.TwoWayCodec
 
 	http2Client *http2.Http2Client
 }
@@ -188,7 +188,7 @@ func NewH2Controller(opt *config.Option) (*H2Controller, error) {
 		option:      opt,
 		address:     opt.Location,
 		closeChan:   make(chan struct{}),
-		twowayCodec: twowayCodec,
+		twoWayCodec: twowayCodec,
 		// todo server end, this is useless
 		http2Client: http2.NewHttp2Client(config.Option{Logger: opt.Logger}),
 	}
@@ -220,7 +220,7 @@ func (hc *H2Controller) newServerStreamFromTripleHeader(path string, header http
 		if !ok {
 			return nil, status.Err(codes.Internal, "can't assert impl of interface "+interfaceKey+" to TripleGrpcService")
 		}
-		// pb twowayCodec needs grpc.Desc to do method discovery, allowing unary and streaming invocation
+		// pb twoWayCodec needs grpc.Desc to do method discovery, allowing unary and streaming invocation
 		mdMap, strMap, err := getMethodAndStreamDescMap(service)
 		if err != nil {
 			hc.option.Logger.Error("new H2 controller error:", err)
@@ -234,13 +234,13 @@ func (hc *H2Controller) newServerStreamFromTripleHeader(path string, header http
 		}
 
 		if okm {
-			newstm, err = stream.NewServerStream(triHeader, unaryRPCDiscovery, hc.option, service, hc.twowayCodec)
+			newstm, err = stream.NewServerStream(triHeader, unaryRPCDiscovery, hc.option, service, hc.twoWayCodec)
 			if err != nil {
 				hc.option.Logger.Error("newServerStream error", err)
 				return nil, err
 			}
 		} else {
-			newstm, err = stream.NewServerStream(triHeader, streamRPCDiscovery, hc.option, service, hc.twowayCodec)
+			newstm, err = stream.NewServerStream(triHeader, streamRPCDiscovery, hc.option, service, hc.twoWayCodec)
 			if err != nil {
 				hc.option.Logger.Error("newServerStream error", err)
 				return nil, err
@@ -251,9 +251,9 @@ func (hc *H2Controller) newServerStreamFromTripleHeader(path string, header http
 		if !ok {
 			return nil, status.Err(codes.Internal, "can't assert impl of interface "+interfaceKey+" to TripleUnaryService")
 		}
-		// hessian twowayCodec doesn't need to use grpc.Desc, and now only support unary invocation
+		// hessian twoWayCodec doesn't need to use grpc.Desc, and now only support unary invocation
 		var err error
-		newstm, err = stream.NewUnaryServerStreamWithOutDesc(triHeader, hc.option, service, hc.twowayCodec, hc.option)
+		newstm, err = stream.NewUnaryServerStreamWithOutDesc(triHeader, hc.option, service, hc.twoWayCodec, hc.option)
 		if err != nil {
 			hc.option.Logger.Errorf("hessian server new server stream error = %v", err)
 			return nil, err
@@ -321,12 +321,12 @@ func (hc *H2Controller) StreamInvoke(ctx context.Context, path string) (grpc.Cli
 		}
 	}()
 
-	return stream.NewClientUserStream(clientStream, hc.twowayCodec, hc.option), nil
+	return stream.NewClientUserStream(clientStream, hc.twoWayCodec, hc.option), nil
 }
 
 // UnaryInvoke can start unary invocation, called by dubbo3 client, with @path and request @data
 func (hc *H2Controller) UnaryInvoke(ctx context.Context, path string, arg, reply interface{}) error {
-	sendData, err := hc.twowayCodec.MarshalRequest(arg)
+	sendData, err := hc.twoWayCodec.MarshalRequest(arg)
 	if err != nil {
 		hc.option.Logger.Errorf("client request marshal error = %v", err)
 		return err
@@ -360,7 +360,7 @@ func (hc *H2Controller) UnaryInvoke(ctx context.Context, path string, arg, reply
 	}
 
 	// all split data are collected and to unmarshal
-	if err := hc.twowayCodec.UnmarshalResponse(rspData, reply); err != nil {
+	if err := hc.twoWayCodec.UnmarshalResponse(rspData, reply); err != nil {
 		hc.option.Logger.Errorf("client unmarshal rsp err= %v\n", err)
 		return err
 	}
