@@ -36,6 +36,10 @@ import (
 	_ "dubbo.apache.org/dubbo-go/v3/registry/nacos"
 	_ "dubbo.apache.org/dubbo-go/v3/registry/protocol"
 	_ "dubbo.apache.org/dubbo-go/v3/registry/zookeeper"
+)
+
+import (
+	"github.com/dubbogo/triple/example/dubbo/go-server/pkg"
 	_ "github.com/dubbogo/triple/pkg/triple"
 )
 
@@ -46,7 +50,7 @@ var (
 
 // need to setup environment variable "CONF_PROVIDER_FILE_PATH" to "conf/server.yml" before run
 func main() {
-	config.SetProviderService(NewGreeterProvider())
+	config.SetProviderService(pkg.NewGreeterProvider())
 	config.Load()
 	initSignal()
 }

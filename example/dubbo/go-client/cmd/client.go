@@ -52,9 +52,13 @@ func main() {
 	time.Sleep(time.Second * 3)
 
 	testSayHello()
+	// stream is not available for dubbo-java
+	//testSayHelloStream()
 }
 
 func testSayHello() {
+	logger.Infof("testSayHello")
+
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, tripleConstant.TripleCtxKey(tripleConstant.TripleRequestID), "triple-request-id-demo")
 
@@ -68,4 +72,32 @@ func testSayHello() {
 	}
 
 	logger.Infof("Receive user = %+v\n", user)
+}
+
+func testSayHelloStream() {
+	logger.Infof("testSayHelloStream")
+
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, tripleConstant.TripleCtxKey(tripleConstant.TripleRequestID), "triple-request-id-demo")
+
+	req := pkg.HelloRequest{
+		Name: "laurence",
+	}
+
+	client, err := greeterProvider.SayHelloStream(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	var user *pkg.User
+	err = client.Send(&req)
+	if err != nil {
+		panic(err)
+	}
+
+	user, err = client.Recv()
+	if err != nil {
+		panic(err)
+	}
+	logger.Infof("Receive user = %+v\n", *user)
 }

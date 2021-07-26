@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package main
+package pkg
 
 import (
 	"context"
@@ -43,27 +43,16 @@ func (s *GreeterProvider) SayHelloStream(svr Greeter_SayHelloStreamServer) error
 		return err
 	}
 	logger.Infof("Dubbo-go3 GreeterProvider recv 1 user, name = %s\n", c.Name)
-	c2, err := svr.Recv()
-	if err != nil {
-		return err
-	}
-	logger.Infof("Dubbo-go3 GreeterProvider recv 2 user, name = %s\n", c2.Name)
-	c3, err := svr.Recv()
-	if err != nil {
-		return err
-	}
-	logger.Infof("Dubbo-go3 GreeterProvider recv 3 user, name = %s\n", c3.Name)
 
-	svr.Send(&User{
+	err = svr.Send(&User{
 		Name: "hello " + c.Name,
 		Age:  18,
 		Id:   "123456789",
 	})
-	svr.Send(&User{
-		Name: "hello " + c2.Name,
-		Age:  19,
-		Id:   "123456789",
-	})
+
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -71,7 +60,7 @@ func (s *GreeterProvider) SayHello(ctx context.Context, in *HelloRequest) (*User
 	logger.Infof("Dubbo3 GreeterProvider get user name = %s\n" + in.Name)
 	fmt.Println("get triple header tri-req-id = ", ctx.Value(tripleConstant.TripleCtxKey(tripleConstant.TripleRequestID)))
 	fmt.Println("get triple header tri-service-version = ", ctx.Value(tripleConstant.TripleCtxKey(tripleConstant.TripleServiceVersion)))
-	return &User{Name: "Hello " + in.Name, Id: "12345", Age: 21}, nil
+	return &User{Name: in.Name, Id: "12345", Age: 21}, nil
 }
 
 func (g *GreeterProvider) Reference() string {
