@@ -123,7 +123,7 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 		if !ok {
 			return nil, status.Errorf(codes.Internal, "msgpack provider service doesn't impl TripleUnaryService")
 		}
-		reqParam, ok := unaryService.GetReqParamsInteface(methodName)
+		reqParam, ok := unaryService.GetReqParamsInterfaces(methodName)
 		if !ok {
 			return nil, status.Errorf(codes.Internal, "provider unmarshal error: no req param data")
 		}
@@ -137,9 +137,12 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 		if err = p.twoWayCodec.UnmarshalRequest(readBuf, reqParam); err != nil {
 			return nil, status.Errorf(codes.Internal, "Unary rpc request unmarshal error: %s", err)
 		}
-		args := make([]interface{}, 0, 1)
-		reqParam = reflect.ValueOf(reqParam).Elem().Interface()
-		args = append(args, reqParam)
+		args := make([]interface{}, 0, len(reqParam))
+		for _, v := range reqParam {
+			tempParamObj := reflect.ValueOf(v).Elem().Interface()
+			args = append(args, tempParamObj)
+		}
+
 		reply, err = unaryService.InvokeWithArgs(header.FieldToCtx(), methodName, args)
 	}
 

@@ -343,7 +343,7 @@ func (hc *H2Controller) UnaryInvoke(ctx context.Context, path string, arg, reply
 		HeaderField: newHeader,
 	})
 	if err != nil {
-		hc.option.Logger.Errorf("triple unary invoke path %s with addr = %s error = %v", path, hc.address, err)
+		hc.option.Logger.Error("triple unary invoke path" + path + " with addr = " + hc.address + " error = " + err.Error())
 		return err
 	}
 

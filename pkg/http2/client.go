@@ -216,7 +216,7 @@ LOOP:
 	}
 
 	if timeoutFlag {
-		h.logger.Errorf("unary call %s with addr = %s timeout", path, addr)
+		h.logger.Error("unary call" + path + " with addr = " + addr + " timeout")
 		return nil, nil, perrors.Errorf("unary call %s timeout", path)
 	}
 

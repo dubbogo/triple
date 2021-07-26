@@ -87,7 +87,13 @@ func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply inter
 	} else {
 		ctx := in[0].Interface().(context.Context)
 		interfaceKey := ctx.Value(constant.InterfaceKey).(string)
-		err := t.Request(ctx, "/"+interfaceKey+"/"+methodName, in[1].Interface(), reply)
+		reqParams := make([]interface{}, 0, len(in)-1)
+		for idx, v := range in {
+			if idx > 0 {
+				reqParams = append(reqParams, v.Interface())
+			}
+		}
+		err := t.Request(ctx, "/"+interfaceKey+"/"+methodName, reqParams, reply)
 		if err != nil {
 			return err
 		}
