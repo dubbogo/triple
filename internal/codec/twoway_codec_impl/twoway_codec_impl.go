@@ -18,13 +18,11 @@
 package twoway_codec_impl
 
 import (
-	perrors "github.com/pkg/errors"
-)
-
-import (
 	"github.com/dubbogo/triple/internal/codec"
 	"github.com/dubbogo/triple/internal/codec/codec_impl"
 	proto2 "github.com/dubbogo/triple/internal/codec/proto"
+	"github.com/dubbogo/triple/internal/codes"
+	"github.com/dubbogo/triple/internal/status"
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
 )
@@ -65,12 +63,15 @@ func NewPBWrapperTwoWayCodec(codecName constant.CodecType) (common.TwoWayCodec, 
 func (h *PBWrapperTwoWayCodec) MarshalRequest(v interface{}) ([]byte, error) {
 	argsBytes := make([][]byte, 0)
 	argsTypes := make([]string, 0)
-	data, err := h.codec.Marshal(v)
-	if err != nil {
-		return nil, err
+	reqList := v.([]interface{})
+	for _, value := range reqList {
+		data, err := h.codec.Marshal(value)
+		if err != nil {
+			return nil, err
+		}
+		argsBytes = append(argsBytes, data)
+		argsTypes = append(argsTypes, codec.GetArgType(value))
 	}
-	argsBytes = append(argsBytes, data)
-	argsTypes = append(argsTypes, codec.GetArgType(v))
 
 	wrapperRequest := &proto2.TripleRequestWrapper{
 		SerializeType: common.GetCodecInWrapperName(h.codecName),
@@ -87,12 +88,18 @@ func (h *PBWrapperTwoWayCodec) UnmarshalRequest(data []byte, v interface{}) erro
 	if err != nil {
 		return err
 	}
-	if len(wrapperRequest.Args) != 1 {
-		return perrors.New("wrapper request args len is not 1")
+
+	paramsInterfaces := v.([]interface{})
+	if len(paramsInterfaces) != len(wrapperRequest.Args) {
+		return status.Errorf(codes.Internal, "error ,request params len is %d, but exported method has %d", len(wrapperRequest.Args), len(paramsInterfaces))
 	}
-	if err := h.codec.Unmarshal(wrapperRequest.Args[0], v); err != nil {
-		return err
+
+	for idx, value := range wrapperRequest.Args {
+		if err := h.codec.Unmarshal(value, paramsInterfaces[idx]); err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 
