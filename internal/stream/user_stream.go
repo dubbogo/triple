@@ -32,7 +32,7 @@ import (
 	"github.com/dubbogo/triple/pkg/config"
 )
 
-// baseUserStream sends or receives data from stream with the help of twoWayCodec.
+// baseUserStream sends data to stream or receives data from stream with the help of twoWayCodec.
 type baseUserStream struct {
 	opt         *config.Option
 	stream      Stream
