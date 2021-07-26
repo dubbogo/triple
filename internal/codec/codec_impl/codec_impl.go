@@ -19,7 +19,9 @@ package codec_impl
 
 import (
 	hessian "github.com/apache/dubbo-go-hessian2"
+
 	"github.com/golang/protobuf/proto"
+
 	mp "github.com/ugorji/go/codec"
 )
 

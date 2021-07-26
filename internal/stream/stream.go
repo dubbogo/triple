@@ -19,11 +19,13 @@ package stream
 
 import (
 	"bytes"
-	perrors "github.com/pkg/errors"
 )
 
 import (
 	h2Triple "github.com/dubbogo/net/http2/triple"
+
+	perrors "github.com/pkg/errors"
+
 	"google.golang.org/grpc"
 )
 

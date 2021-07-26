@@ -26,7 +26,6 @@ import (
 )
 
 ////////////////////////////////Buffer and MsgType
-
 // Message is the basic transfer unit in one stream
 type Message struct {
 	Buffer  *bytes.Buffer

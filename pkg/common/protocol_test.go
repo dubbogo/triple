@@ -26,6 +26,7 @@ import (
 
 import (
 	netTriple "github.com/dubbogo/net/http2/triple"
+
 	"gotest.tools/assert"
 )
 

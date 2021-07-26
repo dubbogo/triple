@@ -43,7 +43,6 @@ import (
 	_ "github.com/dubbogo/triple/pkg/triple"
 )
 
-
 var (
 	survivalTimeout = int(3 * time.Second)
 )

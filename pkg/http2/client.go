@@ -3,21 +3,27 @@ package http2
 import (
 	"bytes"
 	"crypto/tls"
+	"net"
+	"net/http"
+	"strconv"
+	"time"
+)
+
+import (
 	h2 "github.com/dubbogo/net/http2"
 	h2Triple "github.com/dubbogo/net/http2/triple"
+
+	perrors "github.com/pkg/errors"
+)
+
+import (
+	_ "github.com/dubbogo/triple/internal/codec"
 	"github.com/dubbogo/triple/internal/message"
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
 	"github.com/dubbogo/triple/pkg/common/logger"
-	"github.com/dubbogo/triple/pkg/http2/config"
-	perrors "github.com/pkg/errors"
-	"net"
-	"strconv"
-	"time"
-
-	_ "github.com/dubbogo/triple/internal/codec"
 	tconfig "github.com/dubbogo/triple/pkg/config"
-	"net/http"
+	"github.com/dubbogo/triple/pkg/http2/config"
 )
 
 func NewHttp2Client(option tconfig.Option) *Http2Client {
