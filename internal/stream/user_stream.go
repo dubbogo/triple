@@ -33,7 +33,8 @@ import (
 	"github.com/dubbogo/triple/pkg/config"
 )
 
-// baseUserStream sends data to stream or receives data from stream with the help of twoWayCodec.
+// baseUserStream sends data to stream and receives data from stream with the help of twoWayCodec,
+// see also serverUserStream and clientUserStream
 type baseUserStream struct {
 	opt         *config.Option
 	stream      Stream
@@ -59,6 +60,7 @@ func (ss *baseUserStream) Context() context.Context {
 	return nil
 }
 
+// SendMsg sends message `m` to stream
 // nolint
 func (ss *baseUserStream) SendMsg(m interface{}) error {
 	replyData, err := ss.twoWayCodec.MarshalRequest(m)
@@ -70,6 +72,7 @@ func (ss *baseUserStream) SendMsg(m interface{}) error {
 	return nil
 }
 
+// RecvMsg gets message `m` from stream
 // nolint
 func (ss *baseUserStream) RecvMsg(m interface{}) error {
 	recvChan := ss.stream.GetRecv()
@@ -98,7 +101,7 @@ func newServerUserStream(s Stream, serializer common.TwoWayCodec, opt *config.Op
 	}
 }
 
-// clientUserStream can be throw to grpc, and let grpc use it
+// clientUserStream can be thrown to grpc, and let grpc use it
 type clientUserStream struct {
 	baseUserStream
 }
@@ -120,10 +123,10 @@ func (ss *clientUserStream) CloseSend() error {
 }
 
 // nolint
-func NewClientUserStream(s Stream, serilizer common.TwoWayCodec, opt *config.Option) *clientUserStream {
+func NewClientUserStream(s Stream, serializer common.TwoWayCodec, opt *config.Option) *clientUserStream {
 	return &clientUserStream{
 		baseUserStream: baseUserStream{
-			twoWayCodec: serilizer,
+			twoWayCodec: serializer,
 			stream:      s,
 			opt:         opt,
 		},

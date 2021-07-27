@@ -191,6 +191,8 @@ func NewServerStream(header h2Triple.ProtocolHeader, desc interface{}, opt *conf
 		baseStream: *baseStream,
 		header:     header,
 	}
+
+	// get processor for serverStream based on the type of the desc
 	var err error
 	if methodDesc, ok := desc.(grpc.MethodDesc); ok {
 		// pkgHandler and processor are the same level
