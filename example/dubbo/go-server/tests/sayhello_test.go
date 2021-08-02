@@ -8,6 +8,7 @@ import (
 import (
 	"github.com/stretchr/testify/assert"
 )
+
 import (
 	client "github.com/dubbogo/triple/example/dubbo/go-client/pkg"
 	tripleConstant "github.com/dubbogo/triple/pkg/common/constant"

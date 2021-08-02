@@ -23,6 +23,9 @@ import (
 
 import (
 	h2Triple "github.com/dubbogo/net/http2/triple"
+
+	perrors "github.com/pkg/errors"
+
 	"google.golang.org/grpc"
 )
 
@@ -42,11 +45,11 @@ type Stream interface {
 	PutSend(data []byte, msgType message.MsgType)
 	GetSend() <-chan message.Message
 	GetRecv() <-chan message.Message
-	PutSplitedDataRecv(splitedData []byte, msgType message.MsgType, handler common.PackageHandler)
+	PutSplitDataRecv(splitData []byte, msgType message.MsgType, handler common.PackageHandler)
 	Close()
 }
 
-// baseStream ServerStream and clientStream work detail:
+// baseStream, serverStream and clientStream work detail:
 // in server end, when unary call, msg from client is send to recvChan, and then it is read and push to processor to get response.
 // in client end, when unary call, msg from server is send to recvChan, and then response in invoke method.
 /*
@@ -56,12 +59,12 @@ client  ---> send chan ---> triple ---> recv Chan ---> processor
 			recvBuf						sendBuf			   V
 client <--- recv chan <--- triple <--- send chan <---  response
 */
-// baseStream is the basic  impl of stream interface, it impl for basic function of stream
+// baseStream is the basic impl of stream interface, it impl for basic function of stream
 type baseStream struct {
-	recvBuf *message.MsgChain
-	sendBuf *message.MsgChain
+	recvBuf *message.MsgQueue
+	sendBuf *message.MsgQueue
 	service interface{}
-	// splitBuffer is used to cache splited data from network, if exceed
+	// splitBuffer is used to cache split data from network, if exceeded
 	splitBuffer message.Message
 	// fromFrameHeaderDataSize is got from dataFrame's header, which is 5 bytes and contains the total data size
 	// of this package
@@ -85,35 +88,33 @@ func (s *baseStream) PutRecv(data []byte, msgType message.MsgType) {
 	})
 }
 
-// putSplitedDataRecv is called when receive from tripleNetwork, dealing with big package partial to create the whole pkg
+// PutSplitDataRecv is called when receive from tripleNetwork, dealing with big package partial to create the whole pkg
 // @msgType Must be data
-func (s *baseStream) PutSplitedDataRecv(splitedData []byte, msgType message.MsgType, frameHandler common.PackageHandler) {
+func (s *baseStream) PutSplitDataRecv(splitData []byte, msgType message.MsgType, frameHandler common.PackageHandler) {
 	if msgType != message.DataMsgType {
 		return
 	}
 	if s.fromFrameHeaderDataSize == 0 {
 		// should parse data frame header first
 		var totalSize uint32
-		if splitedData, totalSize = frameHandler.Frame2PkgData(splitedData); totalSize == 0 {
+		if splitData, totalSize = frameHandler.Frame2PkgData(splitData); totalSize == 0 {
 			return
 		} else {
 			s.fromFrameHeaderDataSize = totalSize
 		}
 		s.splitBuffer.Reset()
 	}
-	s.splitBuffer.Write(splitedData)
+	s.splitBuffer.Write(splitData)
 	if s.splitBuffer.Len() > int(s.fromFrameHeaderDataSize) {
-		panic("Receive Splited Data is bigger than wanted!!!")
-	}
-
-	if s.splitBuffer.Len() == int(s.fromFrameHeaderDataSize) {
+		panic("Receive Split Data is bigger than wanted!!!")
+	} else if s.splitBuffer.Len() == int(s.fromFrameHeaderDataSize) {
 		s.PutRecv(frameHandler.Pkg2FrameData(s.splitBuffer.Bytes()), msgType)
 		s.splitBuffer.Reset()
 		s.fromFrameHeaderDataSize = 0
 	}
 }
 
-// PutRecv put message type and @data to sendBuf
+// PutSend put message type and @data to sendBuf
 func (s *baseStream) PutSend(data []byte, msgType message.MsgType) {
 	s.sendBuf.Put(message.Message{
 		Buffer:  bytes.NewBuffer(data),
@@ -121,7 +122,7 @@ func (s *baseStream) PutSend(data []byte, msgType message.MsgType) {
 	})
 }
 
-// getRecv get channel of receiving message
+// GetRecv get channel of receiving message
 func (s *baseStream) GetRecv() <-chan message.Message {
 	return s.recvBuf.Get()
 }
@@ -190,6 +191,8 @@ func NewServerStream(header h2Triple.ProtocolHeader, desc interface{}, opt *conf
 		baseStream: *baseStream,
 		header:     header,
 	}
+
+	// get processor for serverStream based on the type of the desc
 	var err error
 	if methodDesc, ok := desc.(grpc.MethodDesc); ok {
 		// pkgHandler and processor are the same level
@@ -198,7 +201,7 @@ func NewServerStream(header h2Triple.ProtocolHeader, desc interface{}, opt *conf
 		serverStream.processor, err = newStreamingProcessor(serverStream, streamDesc, serializer, opt)
 	} else {
 		opt.Logger.Error("grpc desc invalid:", desc)
-		return nil, nil
+		return nil, perrors.Errorf("grpc desc invalid: %v", desc)
 	}
 	if err != nil {
 		opt.Logger.Errorf("new processor error with err = %s\n", err)

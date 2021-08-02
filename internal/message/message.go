@@ -26,7 +26,6 @@ import (
 )
 
 ////////////////////////////////Buffer and MsgType
-
 // Message is the basic transfer unit in one stream
 type Message struct {
 	Buffer  *bytes.Buffer
@@ -60,31 +59,31 @@ func (bm *Message) GetMsgType() MsgType {
 	return bm.MsgType
 }
 
-// MsgChain contain the chan of Message
-type MsgChain struct {
+// MsgQueue contain the chan of Message
+type MsgQueue struct {
 	c chan Message
 }
 
-// NewBufferMsgChain returns new MsgChain
-func NewBufferMsgChain() *MsgChain {
-	b := &MsgChain{
+// NewBufferMsgChain returns new MsgQueue
+func NewBufferMsgChain() *MsgQueue {
+	b := &MsgQueue{
 		c: make(chan Message),
 	}
 	return b
 }
 
 // Put if stream close by force, the Put function doesn't send anything.
-func (b *MsgChain) Put(r Message) {
+func (b *MsgQueue) Put(r Message) {
 	if b.c != nil {
 		b.c <- r
 	}
 }
 
-func (b *MsgChain) Get() <-chan Message {
+func (b *MsgQueue) Get() <-chan Message {
 	return b.c
 }
 
-func (b *MsgChain) Close() {
+func (b *MsgQueue) Close() {
 	close(b.c)
 }
 

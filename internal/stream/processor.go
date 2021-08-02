@@ -26,6 +26,7 @@ import (
 
 import (
 	h2Triple "github.com/dubbogo/net/http2/triple"
+
 	"google.golang.org/grpc"
 )
 
@@ -40,7 +41,7 @@ import (
 )
 
 // processor is the interface, with func runRPC and close
-// it process server RPC method that user defined and get response
+// It processes server RPC method that user defined and get response
 type processor interface {
 	runRPC()
 	close()
@@ -127,13 +128,7 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 		if !ok {
 			return nil, status.Errorf(codes.Internal, "provider unmarshal error: no req param data")
 		}
-		if !ok {
-			return nil, status.Errorf(codes.Internal, "msgpack provider service doesn't impl TripleUnaryService")
-		}
-		_, methodName, e := tools.GetServiceKeyAndUpperCaseMethodNameFromPath(header.GetPath())
-		if e != nil {
-			return nil, e
-		}
+		// get args from buf
 		if err = p.twoWayCodec.UnmarshalRequest(readBuf, reqParam); err != nil {
 			return nil, status.Errorf(codes.Internal, "Unary rpc request unmarshal error: %s", err)
 		}
@@ -142,7 +137,7 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 			tempParamObj := reflect.ValueOf(v).Elem().Interface()
 			args = append(args, tempParamObj)
 		}
-
+		// invoke the service
 		reply, err = unaryService.InvokeWithArgs(header.FieldToCtx(), methodName, args)
 	}
 
@@ -152,7 +147,7 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 
 	replyData, err := p.twoWayCodec.MarshalResponse(reply)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Unary rpc reoly marshal error: %s", err)
+		return nil, status.Errorf(codes.Internal, "Unary rpc reply marshal error: %s", err)
 	}
 
 	return replyData, nil
@@ -217,9 +212,9 @@ func newStreamingProcessor(s *serverStream, desc grpc.StreamDesc, serializer com
 
 // runRPC called by stream
 func (sp *streamingProcessor) runRPC() {
-	serverUserstream := newServerUserStream(sp.stream, sp.twoWayCodec, sp.opt)
+	serverUserStream := newServerUserStream(sp.stream, sp.twoWayCodec, sp.opt)
 	go func() {
-		if err := sp.streamDesc.Handler(sp.stream.getService(), serverUserstream); err != nil {
+		if err := sp.streamDesc.Handler(sp.stream.getService(), serverUserStream); err != nil {
 			sp.handleRPCErr(err)
 			return
 		}

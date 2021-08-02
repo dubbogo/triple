@@ -1,6 +1,8 @@
 package config
 
-import "net/http"
+import (
+	"net/http"
+)
 
 type PostConfig struct {
 	ContentType string

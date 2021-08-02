@@ -2,8 +2,11 @@ package http2
 
 import (
 	"context"
-	h2Triple "github.com/dubbogo/net/http2/triple"
 	"net/http"
+)
+
+import (
+	h2Triple "github.com/dubbogo/net/http2/triple"
 )
 
 // ProtocolHeaderHandlerImpl is the triple imple of net.ProtocolHeaderHandler

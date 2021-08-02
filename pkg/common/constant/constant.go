@@ -17,6 +17,7 @@
 
 package constant
 
+// TripleGrpcService is gRPC service, used to check impl
 // transfer
 const (
 	// TRIPLE is triple protocol name
