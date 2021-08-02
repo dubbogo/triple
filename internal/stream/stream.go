@@ -61,8 +61,8 @@ client <--- recv chan <--- triple <--- send chan <---  response
 */
 // baseStream is the basic impl of stream interface, it impl for basic function of stream
 type baseStream struct {
-	recvBuf *message.MsgChan
-	sendBuf *message.MsgChan
+	recvBuf *message.MsgQueue
+	sendBuf *message.MsgQueue
 	service interface{}
 	// splitBuffer is used to cache split data from network, if exceeded
 	splitBuffer message.Message
