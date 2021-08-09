@@ -42,6 +42,9 @@ type Option struct {
 
 	// logger
 	Logger loggerInteface.Logger
+
+	// ConnectionPool
+	NumWorkers int
 }
 
 // Validate sets empty field to default config

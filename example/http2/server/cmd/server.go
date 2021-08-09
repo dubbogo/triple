@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"runtime"
 	"time"
 )
 
@@ -14,8 +15,9 @@ import (
 )
 
 func main() {
-	svr := http2.NewHttp2Server("localhost:1999", config.ServerConfig{
+	svr := http2.NewServer("localhost:1999", config.ServerConfig{
 		Logger: default_logger.GetDefaultLogger(),
+		NumWorkers: runtime.NumCPU(),
 	})
 	svr.RegisterHandler("/unary", func(path string, header http.Header, recvChan chan *bytes.Buffer, sendChan chan *bytes.Buffer, ctrlCh chan http.Header, errCh chan interface{}) {
 		fmt.Println("path = ", path)

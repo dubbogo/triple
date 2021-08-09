@@ -19,7 +19,7 @@ import (
 )
 
 func TestStream(t *testing.T) {
-	client := http2.NewHttp2Client(tconfig.Option{Logger: default_logger.GetDefaultLogger()})
+	client := http2.NewClient(tconfig.Option{Logger: default_logger.GetDefaultLogger()})
 	header := make(http.Header)
 	header["header1"] = []string{"header1-val"}
 	header["header2"] = []string{"header2-val"}
@@ -47,7 +47,7 @@ func TestStream(t *testing.T) {
 }
 
 func TestUnary(t *testing.T) {
-	client := http2.NewHttp2Client(tconfig.Option{Logger: default_logger.GetDefaultLogger()})
+	client := http2.NewClient(tconfig.Option{Logger: default_logger.GetDefaultLogger()})
 	header := make(http.Header)
 	header["header1"] = []string{"header1-val"}
 	header["header2"] = []string{"header2-val"}

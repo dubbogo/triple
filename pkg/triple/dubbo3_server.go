@@ -32,7 +32,7 @@ import (
 
 // TripleServer is the object that can be started and listening remote request
 type TripleServer struct {
-	http2Server   *triHttp2.Http2Server
+	http2Server   *triHttp2.Server
 	rpcServiceMap *sync.Map
 	done          chan struct{}
 
@@ -61,9 +61,10 @@ func (t *TripleServer) Stop() {
 func (t *TripleServer) Start() {
 	t.opt.Logger.Debug("tripleServer Start at ", t.opt.Location)
 
-	t.http2Server = triHttp2.NewHttp2Server(t.opt.Location, triHttp2Conf.ServerConfig{
+	t.http2Server = triHttp2.NewServer(t.opt.Location, triHttp2Conf.ServerConfig{
 		Logger:        t.opt.Logger,
 		PathExtractor: path.NewDefaultExtractor(),
+		NumWorkers: t.opt.NumWorkers,
 	})
 
 	h2Handler, err := http2_handler.NewH2Controller(t.opt)

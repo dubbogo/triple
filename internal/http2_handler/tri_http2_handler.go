@@ -64,11 +64,11 @@ type H2Controller struct {
 
 	twoWayCodec common.TwoWayCodec
 
-	http2Client *http2.Http2Client
+	http2Client *http2.Client
 }
 
 // GetHandler is called by server when receiving tcp conn, to deal with http2 request
-func (hc *H2Controller) GetHandler(rpcService interface{}) http2.Http2Handler {
+func (hc *H2Controller) GetHandler(rpcService interface{}) http2.Handler {
 	return func(path string, header http.Header, recvChan chan *bytes.Buffer, sendChan chan *bytes.Buffer, ctrlch chan http.Header, errCh chan interface{}) {
 		/*
 			triple trailer fields:
@@ -191,7 +191,7 @@ func NewH2Controller(opt *config.Option) (*H2Controller, error) {
 		closeChan:   make(chan struct{}),
 		twoWayCodec: twowayCodec,
 		// todo server end, this is useless
-		http2Client: http2.NewHttp2Client(config.Option{Logger: opt.Logger}),
+		http2Client: http2.NewClient(config.Option{Logger: opt.Logger}),
 	}
 	return h2c, nil
 }
