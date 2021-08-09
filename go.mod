@@ -4,7 +4,7 @@ go 1.15
 
 require (
 	github.com/apache/dubbo-go-hessian2 v1.9.1
-	github.com/dubbogo/gost v1.11.15 // indirect
+	github.com/dubbogo/gost v1.11.15
 	github.com/dubbogo/net v0.0.3
 	github.com/golang/protobuf v1.5.2
 	github.com/pkg/errors v0.9.1
