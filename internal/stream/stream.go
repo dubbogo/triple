@@ -19,6 +19,7 @@ package stream
 
 import (
 	"bytes"
+	gxsync "github.com/dubbogo/gost/sync"
 )
 
 import (
@@ -163,8 +164,9 @@ func (ss *serverStream) Close() {
 	ss.processor.close()
 }
 
-// nolint
-func NewUnaryServerStreamWithOutDesc(header h2Triple.ProtocolHeader, opt *config.Option, service common.TripleUnaryService, serializer common.TwoWayCodec, option *config.Option) (*serverStream, error) {
+// NewServerStreamForNonPB creates a new server stream for non-protobuf, i.e. hessian.
+func NewServerStreamForNonPB(header h2Triple.ProtocolHeader, opt *config.Option, pool gxsync.WorkerPool,
+	service common.TripleUnaryService, serializer common.TwoWayCodec) (*serverStream, error) {
 	baseStream := newBaseStream(service)
 
 	serverStream := &serverStream{
@@ -172,7 +174,7 @@ func NewUnaryServerStreamWithOutDesc(header h2Triple.ProtocolHeader, opt *config
 		header:     header,
 	}
 	var err error
-	serverStream.processor, err = newUnaryProcessor(serverStream, grpc.MethodDesc{}, serializer, option)
+	serverStream.processor, err = newUnaryProcessor(serverStream, grpc.MethodDesc{}, serializer, pool, opt)
 	if err != nil {
 		opt.Logger.Errorf("new processor error with err = %s\n", err)
 		return nil, err
@@ -183,8 +185,9 @@ func NewUnaryServerStreamWithOutDesc(header h2Triple.ProtocolHeader, opt *config
 	return serverStream, nil
 }
 
-// NewServerStream creates new server stream
-func NewServerStream(header h2Triple.ProtocolHeader, desc interface{}, opt *config.Option, service interface{}, serializer common.TwoWayCodec) (*serverStream, error) {
+// NewServerStreamForPB creates a new server stream for protobuf.
+func NewServerStreamForPB(header h2Triple.ProtocolHeader, desc interface{}, opt *config.Option, pool gxsync.WorkerPool,
+	service interface{}, serializer common.TwoWayCodec) (*serverStream, error) {
 	baseStream := newBaseStream(service)
 
 	serverStream := &serverStream{
@@ -196,9 +199,9 @@ func NewServerStream(header h2Triple.ProtocolHeader, desc interface{}, opt *conf
 	var err error
 	if methodDesc, ok := desc.(grpc.MethodDesc); ok {
 		// pkgHandler and processor are the same level
-		serverStream.processor, err = newUnaryProcessor(serverStream, methodDesc, serializer, opt)
+		serverStream.processor, err = newUnaryProcessor(serverStream, methodDesc, serializer, pool, opt)
 	} else if streamDesc, ok := desc.(grpc.StreamDesc); ok {
-		serverStream.processor, err = newStreamingProcessor(serverStream, streamDesc, serializer, opt)
+		serverStream.processor, err = newStreamingProcessor(serverStream, streamDesc, serializer, pool, opt)
 	} else {
 		opt.Logger.Error("grpc desc invalid:", desc)
 		return nil, perrors.Errorf("grpc desc invalid: %v", desc)

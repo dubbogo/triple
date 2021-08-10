@@ -22,7 +22,7 @@ import (
 )
 
 import (
-	"github.com/dubbogo/triple/internal/http2_handler"
+	"github.com/dubbogo/triple/internal/http2"
 	"github.com/dubbogo/triple/internal/path"
 	"github.com/dubbogo/triple/internal/tools"
 	"github.com/dubbogo/triple/pkg/config"
@@ -67,14 +67,14 @@ func (t *TripleServer) Start() {
 		NumWorkers:    t.opt.NumWorkers,
 	})
 
-	h2Handler, err := http2_handler.NewH2Controller(t.opt)
+	tripleCtl, err := http2.NewTripleController(t.opt)
 	if err != nil {
 		t.opt.Logger.Error("new http2 controller failed with error = %v", err)
 		return
 	}
 
 	t.rpcServiceMap.Range(func(key, value interface{}) bool {
-		t.http2Server.RegisterHandler(key.(string), h2Handler.GetHandler(value))
+		t.http2Server.RegisterHandler(key.(string), tripleCtl.GetHandler(value))
 		return true
 	})
 

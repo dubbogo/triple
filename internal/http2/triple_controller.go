@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package http2_handler
+package http2
 
 import (
 	"bytes"
@@ -28,6 +28,7 @@ import (
 import (
 	perrors "github.com/pkg/errors"
 
+	gxsync "github.com/dubbogo/gost/sync"
 	"google.golang.org/grpc"
 )
 
@@ -46,8 +47,8 @@ import (
 	http2Config "github.com/dubbogo/triple/pkg/http2/config"
 )
 
-// H2Controller is used by dubbo3 client/server, to call http2
-type H2Controller struct {
+// TripleController is used by dubbo3 client/server, to call http2
+type TripleController struct {
 	// address stores target ip:port
 	address string
 
@@ -68,8 +69,10 @@ type H2Controller struct {
 }
 
 // GetHandler is called by server when receiving tcp conn, to deal with http2 request
-func (hc *H2Controller) GetHandler(rpcService interface{}) http2.Handler {
-	return func(path string, header http.Header, recvChan chan *bytes.Buffer, sendChan chan *bytes.Buffer, ctrlch chan http.Header, errCh chan interface{}) {
+func (hc *TripleController) GetHandler(rpcService interface{}) http2.Handler {
+	return func(path string, header http.Header, recvChan chan *bytes.Buffer,
+		sendChan chan *bytes.Buffer, ctrlch chan http.Header,
+		errCh chan interface{}, pool gxsync.WorkerPool) {
 		/*
 			triple trailer fields:
 			http 2 trailers are headers fields sent after header response and body response.
@@ -84,7 +87,7 @@ func (hc *H2Controller) GetHandler(rpcService interface{}) http2.Handler {
 			//traceProtoBin = 0
 		)
 		// new server stream
-		st, err := hc.newServerStreamFromTripleHeader(path, header, rpcService)
+		st, err := hc.newServerStreamFromTripleHeader(path, header, rpcService, pool)
 		if st == nil || err != nil {
 			hc.option.Logger.Errorf("creat server stream error = %v\n", err)
 			errCh <- err
@@ -95,7 +98,7 @@ func (hc *H2Controller) GetHandler(rpcService interface{}) http2.Handler {
 		closeChan := make(chan struct{})
 
 		// start receiving from http2 server, and forward to upper proxy invoker
-		go func() {
+		sendToStream := func() {
 			for {
 				select {
 				case <-closeChan:
@@ -109,7 +112,12 @@ func (hc *H2Controller) GetHandler(rpcService interface{}) http2.Handler {
 					return
 				}
 			}
-		}()
+		}
+		if err := pool.Submit(sendToStream); err != nil {
+			// TODO: output logger
+			hc.closeChan <- struct{}{}
+		}
+
 		rspHeader := make(map[string][]string)
 		rspHeader["content-type"] = []string{"application/grpc+proto"}
 		rspHeader[constant.TrailerKeyGrpcStatus] = []string{"Trailer"}
@@ -118,21 +126,21 @@ func (hc *H2Controller) GetHandler(rpcService interface{}) http2.Handler {
 		ctrlch <- rspHeader
 		// start receiving response from upper proxy invoker, and forward to remote http2 client
 
-	LOOP:
+	Loop:
 		for {
 			select {
 			case <-hc.closeChan:
 				grpcCode = int(codes.Canceled)
 				grpcMessage = "triple server canceled by force" // encodeGrpcMessage(sendMsg.st.Message())
 				// call finished by force
-				break LOOP
+				break Loop
 			case sendMsg := <-streamSendChan:
 				if sendMsg.Buffer == nil || sendMsg.MsgType != message.DataMsgType {
 					if sendMsg.Status != nil {
 						grpcCode = int(sendMsg.Status.Code())
 						grpcMessage = sendMsg.Status.Message()
 					}
-					break LOOP
+					break Loop
 				}
 				sendChan <- sendMsg.Buffer
 			}
@@ -145,13 +153,13 @@ func (hc *H2Controller) GetHandler(rpcService interface{}) http2.Handler {
 		}
 
 		// second response header with trailer fields
-		rspTrialer := make(map[string][]string)
-		rspTrialer[constant.TrailerKeyGrpcStatus] = []string{strconv.Itoa(grpcCode)}
-		rspTrialer[constant.TrailerKeyGrpcMessage] = []string{grpcMessage}
+		rspTrailer := make(map[string][]string)
+		rspTrailer[constant.TrailerKeyGrpcStatus] = []string{strconv.Itoa(grpcCode)}
+		rspTrailer[constant.TrailerKeyGrpcMessage] = []string{grpcMessage}
 
 		// todo now if add this field, java-provider may caused unexpected error.
-		//rspTrialer[constant.TripleTraceProtoBin] = []string{strconv.Itoa(traceProtoBin)}
-		ctrlch <- rspTrialer
+		//rspTrailer[constant.TripleTraceProtoBin] = []string{strconv.Itoa(traceProtoBin)}
+		ctrlch <- rspTrailer
 
 		// close all related go routines
 		close(closeChan)
@@ -171,9 +179,9 @@ func getMethodAndStreamDescMap(ds common.TripleGrpcService) (map[string]grpc.Met
 	return sdMap, strMap, nil
 }
 
-// NewH2Controller can create H2Controller with impl @rpcServiceMap and url
+// NewTripleController can create TripleController with impl @rpcServiceMap and url
 // @opt can be nil or configured by user
-func NewH2Controller(opt *config.Option) (*H2Controller, error) {
+func NewTripleController(opt *config.Option) (*TripleController, error) {
 	var pkgHandler common.PackageHandler
 
 	pkgHandler, _ = common.GetPackagerHandler(opt)
@@ -184,7 +192,7 @@ func NewH2Controller(opt *config.Option) (*H2Controller, error) {
 		return nil, err
 	}
 
-	h2c := &H2Controller{
+	h2c := &TripleController{
 		pkgHandler:  pkgHandler,
 		option:      opt,
 		address:     opt.Location,
@@ -206,7 +214,8 @@ thirdly, new stream and return
 any error occurs in the above procedures are fatal, as the invocation target can't be found.
 todo how to deal with error in this procedure gracefully is to be discussed next
 */
-func (hc *H2Controller) newServerStreamFromTripleHeader(path string, header http.Header, rpcService interface{}) (stream.Stream, error) {
+func (hc *TripleController) newServerStreamFromTripleHeader(path string, header http.Header,
+	rpcService interface{}, pool gxsync.WorkerPool) (stream.Stream, error) {
 	interfaceKey, methodName, err := tools.GetServiceKeyAndUpperCaseMethodNameFromPath(path)
 	if err != nil {
 		return nil, err
@@ -235,13 +244,15 @@ func (hc *H2Controller) newServerStreamFromTripleHeader(path string, header http
 		}
 
 		if okm {
-			newstm, err = stream.NewServerStream(triHeader, unaryRPCDiscovery, hc.option, service, hc.twoWayCodec)
+			newstm, err = stream.NewServerStreamForPB(triHeader, unaryRPCDiscovery, hc.option,
+				pool, service, hc.twoWayCodec)
 			if err != nil {
 				hc.option.Logger.Error("newServerStream error", err)
 				return nil, err
 			}
 		} else {
-			newstm, err = stream.NewServerStream(triHeader, streamRPCDiscovery, hc.option, service, hc.twoWayCodec)
+			newstm, err = stream.NewServerStreamForPB(triHeader, streamRPCDiscovery, hc.option,
+				pool, service, hc.twoWayCodec)
 			if err != nil {
 				hc.option.Logger.Error("newServerStream error", err)
 				return nil, err
@@ -254,7 +265,7 @@ func (hc *H2Controller) newServerStreamFromTripleHeader(path string, header http
 		}
 		// hessian twoWayCodec doesn't need to use grpc.Desc, and now only support unary invocation
 		var err error
-		newstm, err = stream.NewUnaryServerStreamWithOutDesc(triHeader, hc.option, service, hc.twoWayCodec, hc.option)
+		newstm, err = stream.NewServerStreamForNonPB(triHeader, hc.option, pool, service, hc.twoWayCodec)
 		if err != nil {
 			hc.option.Logger.Errorf("hessian server new server stream error = %v", err)
 			return nil, err
@@ -266,7 +277,7 @@ func (hc *H2Controller) newServerStreamFromTripleHeader(path string, header http
 }
 
 // StreamInvoke can start streaming invocation, called by triple client, with @path
-func (hc *H2Controller) StreamInvoke(ctx context.Context, path string) (grpc.ClientStream, error) {
+func (hc *TripleController) StreamInvoke(ctx context.Context, path string) (grpc.ClientStream, error) {
 	clientStream := stream.NewClientStream()
 	tosend := clientStream.GetSend()
 	sendStreamChan := make(chan *bytes.Buffer)
@@ -300,7 +311,7 @@ func (hc *H2Controller) StreamInvoke(ctx context.Context, path string) (grpc.Cli
 		return nil, err
 	}
 	go func() {
-	LOOP:
+	Loop:
 		for {
 			select {
 			case <-hc.closeChan:
@@ -309,7 +320,7 @@ func (hc *H2Controller) StreamInvoke(ctx context.Context, path string) (grpc.Cli
 				if data == nil {
 					// stream receive done, close send go routine
 					close(closeChan)
-					break LOOP
+					break Loop
 				}
 				clientStream.PutRecv(data.Bytes(), message.DataMsgType)
 			}
@@ -326,7 +337,7 @@ func (hc *H2Controller) StreamInvoke(ctx context.Context, path string) (grpc.Cli
 }
 
 // UnaryInvoke can start unary invocation, called by dubbo3 client, with @path and request @data
-func (hc *H2Controller) UnaryInvoke(ctx context.Context, path string, arg, reply interface{}) error {
+func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, reply interface{}) error {
 	sendData, err := hc.twoWayCodec.MarshalRequest(arg)
 	if err != nil {
 		hc.option.Logger.Errorf("client request marshal error = %v", err)
@@ -368,12 +379,12 @@ func (hc *H2Controller) UnaryInvoke(ctx context.Context, path string, arg, reply
 	return nil
 }
 
-// Destroy destroys H2Controller and force close all related goroutine
-func (hc *H2Controller) Destroy() {
+// Destroy destroys TripleController and force close all related goroutine
+func (hc *TripleController) Destroy() {
 	close(hc.closeChan)
 }
 
-func (hc *H2Controller) IsAvailable() bool {
+func (hc *TripleController) IsAvailable() bool {
 	select {
 	case <-hc.closeChan:
 		return false

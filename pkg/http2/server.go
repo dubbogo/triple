@@ -29,21 +29,22 @@ import (
 )
 
 const (
-	defaultMaxConnections = 1e5
+	// defaultNumWorkers #workers for connection pool
+	defaultNumWorkers = 720
 	// DefaultMaxSleepTime max sleep interval in accept
 	DefaultMaxSleepTime = 1 * time.Second
 	// DefaultListenerTimeout tcp listener timeout
 	DefaultListenerTimeout = 1.5e9
 )
 
-var defaultNumWorkers = runtime.NumCPU()
-
 // Handler relays data to upper layer and receives data from upper layer as well.
 // recvChan relays data from lower layer to upper layer, generally lower layer refers to http body data
 // sendChan receives response sent from upper layer
 // ctrlChan receives response header sent from upper layer
 // errChan receives errors sent from upper layer
-type Handler func(path string, header http.Header, recvChan chan *bytes.Buffer, sendChan chan *bytes.Buffer, ctrlChan chan http.Header, errChan chan interface{})
+type Handler func(path string, header http.Header, recvChan chan *bytes.Buffer,
+	sendChan chan *bytes.Buffer, ctrlChan chan http.Header,
+	errChan chan interface{}, pool gxsync.WorkerPool)
 
 // Server is the object that can be started and listening remote request
 type Server struct {
@@ -70,7 +71,7 @@ func NewServer(address string, conf tConfig.ServerConfig) *Server {
 	}
 
 	if conf.NumWorkers <= 0 {
-		conf.Logger.Warnf("the number of workers(=%d) for connection pool is invalid, use defaultNumWorkers(=%d)",
+		conf.Logger.Debugf("the number of workers(=%d) for connection pool is invalid, use defaultNumWorkers(=%d)",
 			conf.NumWorkers, defaultNumWorkers)
 		conf.NumWorkers = defaultNumWorkers
 	}
@@ -267,13 +268,11 @@ func (s *Server) http2HandleFunction(wi http.ResponseWriter, r *http.Request) {
 	// body data from http
 	bodyCh, err := readSplitData(r.Body, s.pool)
 	sendChan := make(chan *bytes.Buffer)
-	recvChan := make(chan *bytes.Buffer)
 	ctrlChan := make(chan http.Header)
 	errChan := make(chan interface{})
 
 	defer func() {
 		close(bodyCh)
-		close(recvChan)
 	}()
 
 	w := wi.(*http2.Http2ResponseWriter)
@@ -292,32 +291,6 @@ func (s *Server) http2HandleFunction(wi http.ResponseWriter, r *http.Request) {
 	headerField := r.Header
 	var handler Handler
 
-	// send body to recvChan
-	relayBody := func() {
-		for {
-			select {
-			// TODO: close read
-			// put body data to recvChan
-			case body, ok := <-bodyCh:
-				if !ok {
-					close(recvChan)
-					return
-				}
-				recvChan <- bytes.NewBuffer(body.Bytes())
-			}
-		}
-	}
-
-	if err := s.pool.Submit(relayBody); err != nil {
-		s.logger.Errorf("relaying body fails: %v\n", err)
-		if err == gxsync.PoolBusyErr {
-			writeResponse(w, s.logger, 503, "server is busy")
-		} else {
-			writeResponse(w, s.logger, 500, err.Error())
-		}
-		return
-	}
-
 	// select a http handler according to the path
 	if handlerName, err := s.pathExtractor.HttpHandlerKey(path); err == nil {
 		if v, ok := s.httpHandlerMap[handlerName]; ok {
@@ -334,7 +307,7 @@ func (s *Server) http2HandleFunction(wi http.ResponseWriter, r *http.Request) {
 	}
 
 	handleRequest := func() {
-		handler(path, headerField, recvChan, sendChan, ctrlChan, errChan)
+		handler(path, headerField, bodyCh, sendChan, ctrlChan, errChan, s.pool)
 	}
 	if err := s.pool.Submit(handleRequest); err != nil {
 		s.logger.Errorf("handling http request fails: %v\n", err)
@@ -364,17 +337,17 @@ func (s *Server) http2HandleFunction(wi http.ResponseWriter, r *http.Request) {
 	success := true
 	errorMsg := ""
 
-loop:
+Loop:
 	for {
 		select {
-		// todo close
+		// TODO: close
 		case err := <-errChan:
 			success = false
 			errorMsg = err.(error).Error()
-			break loop
+			break Loop
 		case sendMsg, ok := <-sendChan:
 			if !ok { // sendChanClose
-				break loop
+				break Loop
 			}
 			sendData := s.frameHandler.Pkg2FrameData(sendMsg.Bytes())
 			if _, err := w.Write(sendData); err != nil {

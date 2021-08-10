@@ -86,16 +86,16 @@ func (h *Client) StreamPost(addr, path string, sendChan chan *bytes.Buffer, opts
 			return
 		}
 		ch, _ := readSplitData(rsp.Body, nil)
-	loop:
+	Loop:
 		for {
 			select {
 			case <-closeChan:
 				close(recvChan)
-				break loop
+				break Loop
 			case data := <-ch:
 				if data == nil {
 					close(recvChan)
-					break loop
+					break Loop
 				}
 				recvChan <- bytes.NewBuffer(data.Bytes())
 			}
@@ -178,7 +178,7 @@ func (h *Client) Post(addr, path string, data []byte, opts *config.PostConfig) (
 	trailerChan := rsp.Body.(*h2Triple.ResponseBody).GetTrailerChan()
 	var trailer http.Header
 	recvTrailer := false
-LOOP:
+Loop:
 	for {
 		select {
 		case dataMsg := <-splitedDataChain:
@@ -188,7 +188,7 @@ LOOP:
 				var totalSize uint32
 				if splitedData, totalSize = h.frameHandler.Frame2PkgData(splitedData); totalSize == 0 {
 					close(readDone)
-					break LOOP
+					break Loop
 				} else {
 					fromFrameHeaderDataSize = totalSize
 				}
@@ -202,7 +202,7 @@ LOOP:
 
 			if splitBuffer.Len() == int(fromFrameHeaderDataSize) {
 				close(readDone)
-				break LOOP
+				break Loop
 			}
 		case tra := <-trailerChan:
 			trailer = tra
@@ -210,7 +210,7 @@ LOOP:
 			http2StatusCode, _ := strconv.Atoi(tra.Get(constant.TrailerKeyHttp2Status))
 			if http2StatusCode != 0 {
 				// todo deal with http2 error
-				break LOOP
+				break Loop
 			}
 
 		case <-timeoutTicker:
@@ -218,7 +218,7 @@ LOOP:
 			close(readDone)
 			// set timeout flag
 			timeoutFlag = true
-			break LOOP
+			break Loop
 		}
 	}
 
