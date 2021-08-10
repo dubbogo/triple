@@ -271,10 +271,6 @@ func (s *Server) http2HandleFunction(wi http.ResponseWriter, r *http.Request) {
 	ctrlChan := make(chan http.Header)
 	errChan := make(chan interface{})
 
-	defer func() {
-		close(bodyCh)
-	}()
-
 	w := wi.(*http2.Http2ResponseWriter)
 
 	if err != nil {

@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
-	"runtime"
 	"time"
+)
+
+import (
+	gxsync "github.com/dubbogo/gost/sync"
 )
 
 import (
@@ -17,9 +20,9 @@ import (
 func main() {
 	svr := http2.NewServer("localhost:1999", config.ServerConfig{
 		Logger: default_logger.GetDefaultLogger(),
-		NumWorkers: runtime.NumCPU(),
 	})
-	svr.RegisterHandler("/unary", func(path string, header http.Header, recvChan chan *bytes.Buffer, sendChan chan *bytes.Buffer, ctrlCh chan http.Header, errCh chan interface{}) {
+	svr.RegisterHandler("/unary", func(path string, header http.Header, recvChan chan *bytes.Buffer,
+		sendChan chan *bytes.Buffer, ctrlCh chan http.Header, errCh chan interface{}, pool gxsync.WorkerPool) {
 		fmt.Println("path = ", path)
 		fmt.Println("header = ", header)
 
@@ -43,7 +46,9 @@ func main() {
 		ctrlCh <- rspHeader2
 	})
 
-	svr.RegisterHandler("/stream", func(path string, header http.Header, recvChan chan *bytes.Buffer, sendChan chan *bytes.Buffer, ctrlCh chan http.Header, errCh chan interface{}) {
+	svr.RegisterHandler("/stream",
+		func(path string, header http.Header, recvChan chan *bytes.Buffer, sendChan chan *bytes.Buffer,
+			ctrlCh chan http.Header, errCh chan interface{}, pool gxsync.WorkerPool) {
 		fmt.Println("path = ", path)
 		fmt.Println("header = ", header)
 
