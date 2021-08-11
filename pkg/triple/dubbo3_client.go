@@ -19,6 +19,7 @@ package triple
 
 import (
 	"context"
+	"github.com/dubbogo/triple/internal/http2"
 	"reflect"
 	"sync"
 )
@@ -28,7 +29,6 @@ import (
 )
 
 import (
-	"github.com/dubbogo/triple/internal/http2_handler"
 	"github.com/dubbogo/triple/internal/tools"
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
@@ -37,7 +37,7 @@ import (
 
 // TripleClient client endpoint that using triple protocol
 type TripleClient struct {
-	h2Controller *http2_handler.H2Controller
+	h2Controller *http2.TripleController
 
 	stubInvoker reflect.Value
 
@@ -57,9 +57,9 @@ type TripleClient struct {
 // @opt is used to init http2 controller, if it's nil, use the default config
 func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error) {
 	opt = tools.AddDefaultOption(opt)
-	h2Controller, err := http2_handler.NewH2Controller(opt)
+	h2Controller, err := http2.NewTripleController(opt)
 	if err != nil {
-		opt.Logger.Errorf("NewH2Controller err = %v", err)
+		opt.Logger.Errorf("NewTripleController err = %v", err)
 		return nil, err
 	}
 	tripleClient := &TripleClient{

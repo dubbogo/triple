@@ -25,6 +25,7 @@ import (
 )
 
 import (
+	gxsync "github.com/dubbogo/gost/sync"
 	h2Triple "github.com/dubbogo/net/http2/triple"
 
 	"google.golang.org/grpc"
@@ -53,6 +54,7 @@ type baseProcessor struct {
 	twoWayCodec common.TwoWayCodec
 	done        chan struct{}
 	quitOnce    sync.Once
+	pool        gxsync.WorkerPool
 	opt         *config.Option
 }
 
@@ -86,13 +88,15 @@ type unaryProcessor struct {
 }
 
 // newUnaryProcessor creates unary processor
-func newUnaryProcessor(s *serverStream, desc grpc.MethodDesc, serializer common.TwoWayCodec, option *config.Option) (processor, error) {
+func newUnaryProcessor(s *serverStream, desc grpc.MethodDesc, serializer common.TwoWayCodec,
+	pool gxsync.WorkerPool, option *config.Option) (processor, error) {
 	return &unaryProcessor{
 		baseProcessor: baseProcessor{
 			twoWayCodec: serializer,
 			stream:      s,
 			done:        make(chan struct{}, 1),
 			quitOnce:    sync.Once{},
+			pool:        pool,
 			opt:         option,
 		},
 		methodDesc: desc,
@@ -197,13 +201,15 @@ type streamingProcessor struct {
 }
 
 // newStreamingProcessor can create new streaming processor
-func newStreamingProcessor(s *serverStream, desc grpc.StreamDesc, serializer common.TwoWayCodec, option *config.Option) (processor, error) {
+func newStreamingProcessor(s *serverStream, desc grpc.StreamDesc, serializer common.TwoWayCodec,
+	pool gxsync.WorkerPool, option *config.Option) (processor, error) {
 	return &streamingProcessor{
 		baseProcessor: baseProcessor{
 			twoWayCodec: serializer,
 			stream:      s,
 			done:        make(chan struct{}, 1),
 			quitOnce:    sync.Once{},
+			pool:        pool,
 			opt:         option,
 		},
 		streamDesc: desc,
@@ -213,7 +219,8 @@ func newStreamingProcessor(s *serverStream, desc grpc.StreamDesc, serializer com
 // runRPC called by stream
 func (sp *streamingProcessor) runRPC() {
 	serverUserStream := newServerUserStream(sp.stream, sp.twoWayCodec, sp.opt)
-	go func() {
+
+	handleRPC := func() {
 		if err := sp.streamDesc.Handler(sp.stream.getService(), serverUserStream); err != nil {
 			sp.handleRPCErr(err)
 			return
@@ -221,5 +228,9 @@ func (sp *streamingProcessor) runRPC() {
 		// for stream rpc, processor should send CloseMsg to lower stream layer to call close
 		// but unary rpc not, unary rpc processor only send data to stream layer
 		sp.handleRPCSuccess(nil)
-	}()
+	}
+
+	if perr := sp.pool.Submit(handleRPC); perr != nil {
+		sp.handleRPCErr(perr)
+	}
 }

@@ -22,7 +22,7 @@ import (
 )
 
 import (
-	"github.com/dubbogo/triple/internal/http2_handler"
+	"github.com/dubbogo/triple/internal/http2"
 	"github.com/dubbogo/triple/internal/path"
 	"github.com/dubbogo/triple/internal/tools"
 	"github.com/dubbogo/triple/pkg/config"
@@ -32,7 +32,7 @@ import (
 
 // TripleServer is the object that can be started and listening remote request
 type TripleServer struct {
-	http2Server   *triHttp2.Http2Server
+	http2Server   *triHttp2.Server
 	rpcServiceMap *sync.Map
 	done          chan struct{}
 
@@ -61,19 +61,20 @@ func (t *TripleServer) Stop() {
 func (t *TripleServer) Start() {
 	t.opt.Logger.Debug("tripleServer Start at ", t.opt.Location)
 
-	t.http2Server = triHttp2.NewHttp2Server(t.opt.Location, triHttp2Conf.ServerConfig{
+	t.http2Server = triHttp2.NewServer(t.opt.Location, triHttp2Conf.ServerConfig{
 		Logger:        t.opt.Logger,
 		PathExtractor: path.NewDefaultExtractor(),
+		NumWorkers:    t.opt.NumWorkers,
 	})
 
-	h2Handler, err := http2_handler.NewH2Controller(t.opt)
+	tripleCtl, err := http2.NewTripleController(t.opt)
 	if err != nil {
 		t.opt.Logger.Error("new http2 controller failed with error = %v", err)
 		return
 	}
 
 	t.rpcServiceMap.Range(func(key, value interface{}) bool {
-		t.http2Server.RegisterHandler(key.(string), h2Handler.GetHandler(value))
+		t.http2Server.RegisterHandler(key.(string), tripleCtl.GetHandler(value))
 		return true
 	})
 

@@ -26,7 +26,7 @@ import (
 	"github.com/dubbogo/triple/pkg/http2/config"
 )
 
-func NewHttp2Client(option tconfig.Option) *Http2Client {
+func NewClient(option tconfig.Option) *Client {
 	headerHandler, err := common.GetPackagerHandler(tconfig.NewTripleOption(tconfig.WithProtocol(constant.TRIPLE)))
 	if err != nil {
 		panic(err)
@@ -38,24 +38,25 @@ func NewHttp2Client(option tconfig.Option) *Http2Client {
 			},
 		},
 	}
-	return &Http2Client{
+	return &Client{
 		frameHandler: headerHandler,
 		logger:       option.Logger,
 		client:       client,
 	}
 }
 
-type Http2Client struct {
+type Client struct {
 	client       http.Client
 	frameHandler common.PackageHandler
 	logger       logger.Logger
 }
 
-func (h *Http2Client) StreamPost(addr, path string, sendChan chan *bytes.Buffer, opts *config.PostConfig) (chan *bytes.Buffer, chan http.Header, error) {
+func (h *Client) StreamPost(addr, path string, sendChan chan *bytes.Buffer, opts *config.PostConfig) (chan *bytes.Buffer, chan http.Header, error) {
 	sendStreamChan := make(chan h2Triple.BufferMsg)
 	closeChan := make(chan struct{})
 	recvChan := make(chan *bytes.Buffer)
 	trailerChan := make(chan http.Header)
+	// receive message from sendChan
 	go func() {
 		for {
 			select {
@@ -84,17 +85,17 @@ func (h *Http2Client) StreamPost(addr, path string, sendChan chan *bytes.Buffer,
 			close(closeChan)
 			return
 		}
-		ch := readSplitData(rsp.Body)
-	LOOP:
+		ch, _ := readSplitData(rsp.Body, nil)
+	Loop:
 		for {
 			select {
 			case <-closeChan:
 				close(recvChan)
-				break LOOP
+				break Loop
 			case data := <-ch:
 				if data == nil {
 					close(recvChan)
-					break LOOP
+					break Loop
 				}
 				recvChan <- bytes.NewBuffer(data.Bytes())
 			}
@@ -109,7 +110,7 @@ func (h *Http2Client) StreamPost(addr, path string, sendChan chan *bytes.Buffer,
 	return recvChan, trailerChan, nil
 }
 
-func (h *Http2Client) Post(addr, path string, data []byte, opts *config.PostConfig) ([]byte, http.Header, error) {
+func (h *Client) Post(addr, path string, data []byte, opts *config.PostConfig) ([]byte, http.Header, error) {
 	sendStreamChan := make(chan h2Triple.BufferMsg, 2)
 
 	sendStreamChan <- h2Triple.BufferMsg{
@@ -177,7 +178,7 @@ func (h *Http2Client) Post(addr, path string, data []byte, opts *config.PostConf
 	trailerChan := rsp.Body.(*h2Triple.ResponseBody).GetTrailerChan()
 	var trailer http.Header
 	recvTrailer := false
-LOOP:
+Loop:
 	for {
 		select {
 		case dataMsg := <-splitedDataChain:
@@ -187,7 +188,7 @@ LOOP:
 				var totalSize uint32
 				if splitedData, totalSize = h.frameHandler.Frame2PkgData(splitedData); totalSize == 0 {
 					close(readDone)
-					break LOOP
+					break Loop
 				} else {
 					fromFrameHeaderDataSize = totalSize
 				}
@@ -201,7 +202,7 @@ LOOP:
 
 			if splitBuffer.Len() == int(fromFrameHeaderDataSize) {
 				close(readDone)
-				break LOOP
+				break Loop
 			}
 		case tra := <-trailerChan:
 			trailer = tra
@@ -209,7 +210,7 @@ LOOP:
 			http2StatusCode, _ := strconv.Atoi(tra.Get(constant.TrailerKeyHttp2Status))
 			if http2StatusCode != 0 {
 				// todo deal with http2 error
-				break LOOP
+				break Loop
 			}
 
 		case <-timeoutTicker:
@@ -217,7 +218,7 @@ LOOP:
 			close(readDone)
 			// set timeout flag
 			timeoutFlag = true
-			break LOOP
+			break Loop
 		}
 	}
 

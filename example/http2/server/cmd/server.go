@@ -8,16 +8,21 @@ import (
 )
 
 import (
+	gxsync "github.com/dubbogo/gost/sync"
+)
+
+import (
 	"github.com/dubbogo/triple/pkg/common/logger/default_logger"
 	"github.com/dubbogo/triple/pkg/http2"
 	"github.com/dubbogo/triple/pkg/http2/config"
 )
 
 func main() {
-	svr := http2.NewHttp2Server("localhost:1999", config.ServerConfig{
+	svr := http2.NewServer("localhost:1999", config.ServerConfig{
 		Logger: default_logger.GetDefaultLogger(),
 	})
-	svr.RegisterHandler("/unary", func(path string, header http.Header, recvChan chan *bytes.Buffer, sendChan chan *bytes.Buffer, ctrlCh chan http.Header, errCh chan interface{}) {
+	svr.RegisterHandler("/unary", func(path string, header http.Header, recvChan chan *bytes.Buffer,
+		sendChan chan *bytes.Buffer, ctrlCh chan http.Header, errCh chan interface{}, pool gxsync.WorkerPool) {
 		fmt.Println("path = ", path)
 		fmt.Println("header = ", header)
 
@@ -41,7 +46,9 @@ func main() {
 		ctrlCh <- rspHeader2
 	})
 
-	svr.RegisterHandler("/stream", func(path string, header http.Header, recvChan chan *bytes.Buffer, sendChan chan *bytes.Buffer, ctrlCh chan http.Header, errCh chan interface{}) {
+	svr.RegisterHandler("/stream",
+		func(path string, header http.Header, recvChan chan *bytes.Buffer, sendChan chan *bytes.Buffer,
+			ctrlCh chan http.Header, errCh chan interface{}, pool gxsync.WorkerPool) {
 		fmt.Println("path = ", path)
 		fmt.Println("header = ", header)
 
