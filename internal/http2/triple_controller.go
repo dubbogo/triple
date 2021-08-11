@@ -238,7 +238,7 @@ func NewTripleController(opt *config.Option) (*TripleController, error) {
 			NumWorkers: int(opt.NumWorkers),
 			NumQueues:  runtime.NumCPU(),
 			QueueSize:  0,
-			Logger: opt.Logger,
+			Logger:     opt.Logger,
 		}),
 	}
 	return h2c, nil
