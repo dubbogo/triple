@@ -20,13 +20,17 @@ package http2_handler
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"net/http"
 	"strconv"
 	"sync"
 )
 
 import (
+	"github.com/golang/protobuf/proto"
+
 	perrors "github.com/pkg/errors"
+
 	"google.golang.org/grpc"
 )
 
@@ -78,18 +82,27 @@ func (hc *H2Controller) GetHandler(rpcService interface{}) http2.Http2Handler {
 			traceProtoBin is uint type, triple defined header.
 		*/
 		var (
-			grpcMessage = ""
-			grpcCode    = 0
-			//traceProtoBin = 0
+			tripleStatus *status.Status
 		)
+
+		rspHeader := make(map[string][]string)
+		rspHeader["content-type"] = []string{"application/grpc+proto"}
+		rspHeader[constant.TrailerKeyGrpcStatus] = []string{constant.TrailerKey}
+		rspHeader[constant.TrailerKeyGrpcMessage] = []string{constant.TrailerKey}
+		rspHeader[constant.TrailerKeyTraceProtoBin] = []string{constant.TrailerKey}
+		rspHeader[constant.TrailerKeyGrpcDetailsBin] = []string{constant.TrailerKey}
+		ctrlch <- rspHeader
+
 		// new server stream
 		st, err := hc.newServerStreamFromTripleHeader(path, header, rpcService)
 		if st == nil || err != nil {
 			hc.option.Logger.Errorf("creat server stream error = %v\n", err)
-			errCh <- err
+			tripleStatus, _ = status.FromError(err)
 			close(sendChan)
+			hc.handleStatusAndResponse(tripleStatus, ctrlch)
 			return
 		}
+
 		streamSendChan := st.GetSend()
 		closeChan := make(chan struct{})
 
@@ -109,52 +122,51 @@ func (hc *H2Controller) GetHandler(rpcService interface{}) http2.Http2Handler {
 				}
 			}
 		}()
-		rspHeader := make(map[string][]string)
-		rspHeader["content-type"] = []string{"application/grpc+proto"}
-		rspHeader[constant.TrailerKeyGrpcStatus] = []string{"Trailer"}
-		rspHeader[constant.TrailerKeyGrpcMessage] = []string{"Trailer"}
-		rspHeader[constant.TrailerKeyTraceProtoBin] = []string{"Trailer"}
-		ctrlch <- rspHeader
-		// start receiving response from upper proxy invoker, and forward to remote http2 client
 
 	LOOP:
 		for {
 			select {
 			case <-hc.closeChan:
-				grpcCode = int(codes.Canceled)
-				grpcMessage = "triple server canceled by force" // encodeGrpcMessage(sendMsg.st.Message())
+				tripleStatus = status.New(codes.Canceled, "triple server canceled by force")
 				// call finished by force
 				break LOOP
 			case sendMsg := <-streamSendChan:
 				if sendMsg.Buffer == nil || sendMsg.MsgType != message.DataMsgType {
 					if sendMsg.Status != nil {
-						grpcCode = int(sendMsg.Status.Code())
-						grpcMessage = sendMsg.Status.Message()
+						tripleStatus = status.FromProto(sendMsg.Status.Proto())
 					}
 					break LOOP
 				}
 				sendChan <- sendMsg.Buffer
 			}
 		}
+		close(sendChan)
 
-		if grpcCode == 0 {
-			close(sendChan)
-		} else {
-			errCh <- perrors.New(grpcMessage)
-		}
-
-		// second response header with trailer fields
-		rspTrialer := make(map[string][]string)
-		rspTrialer[constant.TrailerKeyGrpcStatus] = []string{strconv.Itoa(grpcCode)}
-		rspTrialer[constant.TrailerKeyGrpcMessage] = []string{grpcMessage}
-
-		// todo now if add this field, java-provider may caused unexpected error.
-		//rspTrialer[constant.TripleTraceProtoBin] = []string{strconv.Itoa(traceProtoBin)}
-		ctrlch <- rspTrialer
-
+		hc.handleStatusAndResponse(tripleStatus, ctrlch)
 		// close all related go routines
 		close(closeChan)
 	}
+}
+
+func (hc *H2Controller) handleStatusAndResponse(tripleStatus *status.Status, ctrlch chan http.Header) {
+	// second response header with trailer fields
+	rspTrialer := make(map[string][]string)
+	rspTrialer[constant.TrailerKeyGrpcStatus] = []string{strconv.Itoa(int(tripleStatus.Code()))} //[]string{strconv.Itoa(int(tripleStatus.Code()))}
+	rspTrialer[constant.TrailerKeyGrpcMessage] = []string{tripleStatus.Message()}
+	statusProto := tripleStatus.Proto()
+	if statusProto != nil {
+		if stBytes, err := proto.Marshal(statusProto); err != nil {
+			hc.option.Logger.Errorf("transport: failed to marshal rpc status: %v, error: %v", statusProto, err)
+		} else {
+			rspTrialer[constant.TrailerKeyGrpcDetailsBin] = []string{
+				base64.RawStdEncoding.EncodeToString(stBytes)}
+		}
+	}
+
+	// todo now if add this field, java-provider may caused unexpected error.
+	//rspTrialer[constant.TripleTraceProtoBin] = []string{strconv.Itoa(traceProtoBin)}
+
+	ctrlch <- rspTrialer
 }
 
 // getMethodAndStreamDescMap get unary method desc map and stream method desc map from dubbo3 stub

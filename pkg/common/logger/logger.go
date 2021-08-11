@@ -17,6 +17,15 @@
 
 package logger
 
+// TripleGrpcService is gRPC service, used to check impl
+// TripleGrpcService is gRPC service, used to check impl
+// TripleGrpcService is gRPC service, used to check impl
+// transfer
+// TripleGrpcService is gRPC service, used to check impl
+// TripleGrpcService is gRPC service, used to check impl
+// transfer
+// TripleGrpcService is gRPC service, used to check impl
+// transfer
 // Logger is the interface for Logger types
 type Logger interface {
 	Info(args ...interface{})

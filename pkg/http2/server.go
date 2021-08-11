@@ -14,6 +14,7 @@ import (
 
 import (
 	"github.com/dubbogo/net/http2"
+
 	perrors "github.com/pkg/errors"
 )
 
@@ -265,7 +266,7 @@ func (s *Http2Server) http2HandleFunction(wi http.ResponseWriter, r *http.Reques
 		//todo add error handler interface, let user define their handler
 		err := perrors.Errorf("request path = %s, which is not match any handler", path)
 		s.logger.Warn(err)
-		w.WriteHeader(400)
+		w.WriteHeader(http.StatusBadRequest)
 		if _, err2 := w.Write([]byte(err.Error())); err2 != nil {
 			s.logger.Errorf("write back rsp error message %s, with err = %v", err.Error(), err2)
 		}
@@ -279,17 +280,17 @@ func (s *Http2Server) http2HandleFunction(wi http.ResponseWriter, r *http.Reques
 	// first response
 	firstRspHeaderMap := <-ctrlChan
 	for k, v := range firstRspHeaderMap {
-		if len(v) > 0 && v[0] == "Trailer" {
-			w.Header().Add("Trailer", k)
+		if len(v) > 0 && v[0] == constant.TrailerKey {
+			w.Header().Add(constant.TrailerKey, k)
 		} else {
 			for _, vi := range v {
 				w.Header().Add(k, vi)
 			}
 		}
 	}
-	w.Header().Add("Trailer", constant.TrailerKeyHttp2Message)
-	w.Header().Add("Trailer", constant.TrailerKeyHttp2Status)
-	w.WriteHeader(200)
+	w.Header().Add(constant.TrailerKey, constant.TrailerKeyHttp2Message)
+	w.Header().Add(constant.TrailerKey, constant.TrailerKeyHttp2Status)
+	w.WriteHeader(http.StatusOK)
 	w.FlushHeader()
 	success := true
 	errorMsg := ""

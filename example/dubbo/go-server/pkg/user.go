@@ -20,11 +20,14 @@ package pkg
 import (
 	"context"
 	"fmt"
-	tripleConstant "github.com/dubbogo/triple/pkg/common/constant"
 )
 
 import (
 	"dubbo.apache.org/dubbo-go/v3/common/logger"
+)
+
+import (
+	tripleConstant "github.com/dubbogo/triple/pkg/common/constant"
 )
 
 type GreeterProvider struct {
