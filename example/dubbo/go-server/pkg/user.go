@@ -20,6 +20,7 @@ package pkg
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 import (
@@ -62,6 +63,7 @@ func (s *GreeterProvider) SayHelloStream(svr Greeter_SayHelloStreamServer) error
 func (s *GreeterProvider) SayHello(ctx context.Context, in *HelloRequest) (*User, error) {
 	logger.Infof("Dubbo3 GreeterProvider get user name = %s\n" + in.Name)
 	fmt.Println("get triple header tri-req-id = ", ctx.Value(tripleConstant.TripleCtxKey(tripleConstant.TripleRequestID)))
+	time.Sleep(time.Second * 1)
 	fmt.Println("get triple header tri-service-version = ", ctx.Value(tripleConstant.TripleCtxKey(tripleConstant.TripleServiceVersion)))
 	return &User{Name: in.Name, Id: "12345", Age: 21}, nil
 }

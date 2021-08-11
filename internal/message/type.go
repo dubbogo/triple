@@ -17,12 +17,6 @@
 
 package message
 
-////////////////////////////////Buffer and MsgType
-// Message is the basic transfer unit in one stream
-////////////////////////////////Buffer and MsgType
-// Message is the basic transfer unit in one stream
-////////////////////////////////Buffer and MsgType
-// Message is the basic transfer unit in one stream
 // MsgType show the type of Message in message
 type MsgType uint8
 

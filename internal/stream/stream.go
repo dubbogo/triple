@@ -19,11 +19,13 @@ package stream
 
 import (
 	"bytes"
+	"context"
 )
 
 import (
+	gxsync "github.com/dubbogo/gost/sync"
 	h2Triple "github.com/dubbogo/net/http2/triple"
-
+	perrors "github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
@@ -43,11 +45,11 @@ type Stream interface {
 	PutSend(data []byte, msgType message.MsgType)
 	GetSend() <-chan message.Message
 	GetRecv() <-chan message.Message
-	PutSplitedDataRecv(splitedData []byte, msgType message.MsgType, handler common.PackageHandler)
+	PutSplitDataRecv(splitData []byte, msgType message.MsgType, handler common.PackageHandler)
 	Close()
 }
 
-// baseStream ServerStream and clientStream work detail:
+// baseStream, serverStream and clientStream work detail:
 // in server end, when unary call, msg from client is send to recvChan, and then it is read and push to processor to get response.
 // in client end, when unary call, msg from server is send to recvChan, and then response in invoke method.
 /*
@@ -57,12 +59,12 @@ client  ---> send chan ---> triple ---> recv Chan ---> processor
 			recvBuf						sendBuf			   V
 client <--- recv chan <--- triple <--- send chan <---  response
 */
-// baseStream is the basic  impl of stream interface, it impl for basic function of stream
+// baseStream is the basic impl of stream interface, it impl for basic function of stream
 type baseStream struct {
-	recvBuf *message.MsgChain
-	sendBuf *message.MsgChain
+	recvBuf *message.MsgQueue
+	sendBuf *message.MsgQueue
 	service interface{}
-	// splitBuffer is used to cache splited data from network, if exceed
+	// splitBuffer is used to cache split data from network, if exceeded
 	splitBuffer message.Message
 	// fromFrameHeaderDataSize is got from dataFrame's header, which is 5 bytes and contains the total data size
 	// of this package
@@ -86,35 +88,33 @@ func (s *baseStream) PutRecv(data []byte, msgType message.MsgType) {
 	})
 }
 
-// putSplitedDataRecv is called when receive from tripleNetwork, dealing with big package partial to create the whole pkg
+// PutSplitDataRecv is called when receive from tripleNetwork, dealing with big package partial to create the whole pkg
 // @msgType Must be data
-func (s *baseStream) PutSplitedDataRecv(splitedData []byte, msgType message.MsgType, frameHandler common.PackageHandler) {
+func (s *baseStream) PutSplitDataRecv(splitData []byte, msgType message.MsgType, frameHandler common.PackageHandler) {
 	if msgType != message.DataMsgType {
 		return
 	}
 	if s.fromFrameHeaderDataSize == 0 {
 		// should parse data frame header first
 		var totalSize uint32
-		if splitedData, totalSize = frameHandler.Frame2PkgData(splitedData); totalSize == 0 {
+		if splitData, totalSize = frameHandler.Frame2PkgData(splitData); totalSize == 0 {
 			return
 		} else {
 			s.fromFrameHeaderDataSize = totalSize
 		}
 		s.splitBuffer.Reset()
 	}
-	s.splitBuffer.Write(splitedData)
+	s.splitBuffer.Write(splitData)
 	if s.splitBuffer.Len() > int(s.fromFrameHeaderDataSize) {
-		panic("Receive Splited Data is bigger than wanted!!!")
-	}
-
-	if s.splitBuffer.Len() == int(s.fromFrameHeaderDataSize) {
+		panic("Receive Split Data is bigger than wanted!!!")
+	} else if s.splitBuffer.Len() == int(s.fromFrameHeaderDataSize) {
 		s.PutRecv(frameHandler.Pkg2FrameData(s.splitBuffer.Bytes()), msgType)
 		s.splitBuffer.Reset()
 		s.fromFrameHeaderDataSize = 0
 	}
 }
 
-// PutRecv put message type and @data to sendBuf
+// PutSend put message type and @data to sendBuf
 func (s *baseStream) PutSend(data []byte, msgType message.MsgType) {
 	s.sendBuf.Put(message.Message{
 		Buffer:  bytes.NewBuffer(data),
@@ -122,7 +122,7 @@ func (s *baseStream) PutSend(data []byte, msgType message.MsgType) {
 	})
 }
 
-// getRecv get channel of receiving message
+// GetRecv get channel of receiving message
 func (s *baseStream) GetRecv() <-chan message.Message {
 	return s.recvBuf.Get()
 }
@@ -163,8 +163,9 @@ func (ss *serverStream) Close() {
 	ss.processor.close()
 }
 
-// nolint
-func NewUnaryServerStreamWithOutDesc(header h2Triple.ProtocolHeader, opt *config.Option, service common.TripleUnaryService, serializer common.TwoWayCodec, option *config.Option) (*serverStream, error) {
+// NewServerStreamForNonPB creates a new server stream for non-protobuf, i.e. hessian.
+func NewServerStreamForNonPB(ctx context.Context, header h2Triple.ProtocolHeader, opt *config.Option, pool gxsync.WorkerPool,
+	service common.TripleUnaryService, serializer common.TwoWayCodec) (*serverStream, error) {
 	baseStream := newBaseStream(service)
 
 	serverStream := &serverStream{
@@ -172,43 +173,42 @@ func NewUnaryServerStreamWithOutDesc(header h2Triple.ProtocolHeader, opt *config
 		header:     header,
 	}
 	var err error
-	serverStream.processor, err = newUnaryProcessor(serverStream, grpc.MethodDesc{}, serializer, option)
+	serverStream.processor, err = newUnaryProcessor(serverStream, grpc.MethodDesc{}, serializer, pool, opt)
 	if err != nil {
 		opt.Logger.Errorf("new processor error with err = %s\n", err)
 		return nil, err
 	}
 
-	serverStream.processor.runRPC()
-
-	return serverStream, nil
+	return serverStream, serverStream.processor.runRPC(ctx)
 }
 
-// NewServerStream creates new server stream
-func NewServerStream(header h2Triple.ProtocolHeader, desc interface{}, opt *config.Option, service interface{}, serializer common.TwoWayCodec) (*serverStream, error) {
+// NewServerStreamForPB creates a new server stream for protobuf.
+func NewServerStreamForPB(ctx context.Context, header h2Triple.ProtocolHeader, desc interface{}, opt *config.Option, pool gxsync.WorkerPool,
+	service interface{}, serializer common.TwoWayCodec) (*serverStream, error) {
 	baseStream := newBaseStream(service)
 
 	serverStream := &serverStream{
 		baseStream: *baseStream,
 		header:     header,
 	}
+
+	// get processor for serverStream based on the type of the desc
 	var err error
 	if methodDesc, ok := desc.(grpc.MethodDesc); ok {
 		// pkgHandler and processor are the same level
-		serverStream.processor, err = newUnaryProcessor(serverStream, methodDesc, serializer, opt)
+		serverStream.processor, err = newUnaryProcessor(serverStream, methodDesc, serializer, pool, opt)
 	} else if streamDesc, ok := desc.(grpc.StreamDesc); ok {
-		serverStream.processor, err = newStreamingProcessor(serverStream, streamDesc, serializer, opt)
+		serverStream.processor, err = newStreamingProcessor(serverStream, streamDesc, serializer, pool, opt)
 	} else {
 		opt.Logger.Error("grpc desc invalid:", desc)
-		return nil, nil
+		return nil, perrors.Errorf("grpc desc invalid: %v", desc)
 	}
 	if err != nil {
 		opt.Logger.Errorf("new processor error with err = %s\n", err)
 		return nil, err
 	}
 
-	serverStream.processor.runRPC()
-
-	return serverStream, nil
+	return serverStream, serverStream.processor.runRPC(ctx)
 }
 
 // getService return RPCService that user defined and registered.

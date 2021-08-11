@@ -19,12 +19,14 @@ package stream
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"reflect"
 	"sync"
 )
 
 import (
+	gxsync "github.com/dubbogo/gost/sync"
 	h2Triple "github.com/dubbogo/net/http2/triple"
 
 	"google.golang.org/grpc"
@@ -41,9 +43,9 @@ import (
 )
 
 // processor is the interface, with func runRPC and close
-// it process server RPC method that user defined and get response
+// It processes server RPC method that user defined and get response
 type processor interface {
-	runRPC()
+	runRPC(ctx context.Context) error
 	close()
 }
 
@@ -53,6 +55,7 @@ type baseProcessor struct {
 	twoWayCodec common.TwoWayCodec
 	done        chan struct{}
 	quitOnce    sync.Once
+	pool        gxsync.WorkerPool
 	opt         *config.Option
 }
 
@@ -86,13 +89,15 @@ type unaryProcessor struct {
 }
 
 // newUnaryProcessor creates unary processor
-func newUnaryProcessor(s *serverStream, desc grpc.MethodDesc, serializer common.TwoWayCodec, option *config.Option) (processor, error) {
+func newUnaryProcessor(s *serverStream, desc grpc.MethodDesc, serializer common.TwoWayCodec,
+	pool gxsync.WorkerPool, option *config.Option) (processor, error) {
 	return &unaryProcessor{
 		baseProcessor: baseProcessor{
 			twoWayCodec: serializer,
 			stream:      s,
 			done:        make(chan struct{}, 1),
 			quitOnce:    sync.Once{},
+			pool:        pool,
 			opt:         option,
 		},
 		methodDesc: desc,
@@ -128,13 +133,7 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 		if !ok {
 			return nil, status.Errorf(codes.Internal, "provider unmarshal error: no req param data")
 		}
-		if !ok {
-			return nil, status.Errorf(codes.Internal, "msgpack provider service doesn't impl TripleUnaryService")
-		}
-		_, methodName, e := tools.GetServiceKeyAndUpperCaseMethodNameFromPath(header.GetPath())
-		if e != nil {
-			return nil, e
-		}
+		// get args from buf
 		if err = p.twoWayCodec.UnmarshalRequest(readBuf, reqParam); err != nil {
 			return nil, status.Errorf(codes.Internal, "Unary rpc request unmarshal error: %s", err)
 		}
@@ -143,7 +142,7 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 			tempParamObj := reflect.ValueOf(v).Elem().Interface()
 			args = append(args, tempParamObj)
 		}
-
+		// invoke the service
 		reply, err = unaryService.InvokeWithArgs(header.FieldToCtx(), methodName, args)
 	}
 
@@ -153,17 +152,19 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 
 	replyData, err := p.twoWayCodec.MarshalResponse(reply)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Unary rpc reoly marshal error: %s", err)
+		return nil, status.Errorf(codes.Internal, "Unary rpc reply marshal error: %s", err)
 	}
 
 	return replyData, nil
 }
 
 // runRPC is called by lower layer's stream
-func (p *unaryProcessor) runRPC() {
+func (p *unaryProcessor) runRPC(ctx context.Context) error {
 	recvChan := p.stream.GetRecv()
-	go func() {
+	if perr := p.pool.Submit(func() {
 		select {
+		case <-ctx.Done():
+			return
 		case <-p.done:
 			// in this case, server doesn't receive data but got close signal, it returns canceled code
 			p.opt.Logger.Warn("unaryProcessor closed by force")
@@ -193,7 +194,10 @@ func (p *unaryProcessor) runRPC() {
 			p.handleRPCSuccess(rspData)
 			return
 		}
-	}()
+	}); perr != nil {
+		return status.Errorf(codes.ResourceExhausted, "go routine pool full with error = %v", perr)
+	}
+	return nil
 }
 
 // streamingProcessor used to process streaming invocation
@@ -203,13 +207,15 @@ type streamingProcessor struct {
 }
 
 // newStreamingProcessor can create new streaming processor
-func newStreamingProcessor(s *serverStream, desc grpc.StreamDesc, serializer common.TwoWayCodec, option *config.Option) (processor, error) {
+func newStreamingProcessor(s *serverStream, desc grpc.StreamDesc, serializer common.TwoWayCodec,
+	pool gxsync.WorkerPool, option *config.Option) (processor, error) {
 	return &streamingProcessor{
 		baseProcessor: baseProcessor{
 			twoWayCodec: serializer,
 			stream:      s,
 			done:        make(chan struct{}, 1),
 			quitOnce:    sync.Once{},
+			pool:        pool,
 			opt:         option,
 		},
 		streamDesc: desc,
@@ -217,15 +223,19 @@ func newStreamingProcessor(s *serverStream, desc grpc.StreamDesc, serializer com
 }
 
 // runRPC called by stream
-func (sp *streamingProcessor) runRPC() {
-	serverUserstream := newServerUserStream(sp.stream, sp.twoWayCodec, sp.opt)
-	go func() {
-		if err := sp.streamDesc.Handler(sp.stream.getService(), serverUserstream); err != nil {
+func (sp *streamingProcessor) runRPC(ctx context.Context) error {
+	serverUserStream := newServerUserStream(sp.stream, sp.twoWayCodec, sp.opt)
+
+	if perr := sp.pool.Submit(func() {
+		if err := sp.streamDesc.Handler(sp.stream.getService(), serverUserStream); err != nil {
 			sp.handleRPCErr(err)
 			return
 		}
 		// for stream rpc, processor should send CloseMsg to lower stream layer to call close
 		// but unary rpc not, unary rpc processor only send data to stream layer
 		sp.handleRPCSuccess(nil)
-	}()
+	}); perr != nil {
+		return status.Errorf(codes.ResourceExhausted, "go routine pool full with error = %v", perr)
+	}
+	return nil
 }

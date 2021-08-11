@@ -19,6 +19,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"time"
 )
 
@@ -33,6 +35,7 @@ import (
 	_ "dubbo.apache.org/dubbo-go/v3/protocol/grpc"
 	_ "dubbo.apache.org/dubbo-go/v3/registry/protocol"
 	_ "dubbo.apache.org/dubbo-go/v3/registry/zookeeper"
+	"go.uber.org/atomic"
 )
 
 import (
@@ -50,8 +53,8 @@ func init() {
 func main() {
 	config.Load()
 	time.Sleep(time.Second * 3)
-
 	testSayHello()
+
 	// stream is not available for dubbo-java
 	//testSayHelloStream()
 }
@@ -70,8 +73,42 @@ func testSayHello() {
 	if err != nil {
 		panic(err)
 	}
+}
 
-	logger.Infof("Receive user = %+v\n", user)
+
+func testSayHelloWithHighParallel() {
+	logger.Infof("testSayHello")
+
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, tripleConstant.TripleCtxKey(tripleConstant.TripleRequestID), "triple-request-id-demo")
+
+	req := pkg.HelloRequest{
+		Name: "laurence",
+	}
+	user := pkg.User{}
+	for {
+		wg := sync.WaitGroup{}
+		goodCounter := atomic.Uint32{}
+		badCounter := atomic.Uint32{}
+		for i := 0; i < 1000; i ++{
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err := greeterProvider.SayHello(ctx, &req, &user)
+				if err != nil {
+					badCounter.Inc()
+					logger.Error(err)
+					return
+				}
+				goodCounter.Inc()
+				logger.Infof("Receive user = %+v\n", user)
+			}()
+		}
+		wg.Wait()
+		fmt.Println("goodCounter = ", goodCounter.Load())
+		fmt.Println("badCounter = ", badCounter.Load())
+		time.Sleep(time.Second*5)
+	}
 }
 
 func testSayHelloStream() {

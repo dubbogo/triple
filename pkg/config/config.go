@@ -42,6 +42,9 @@ type Option struct {
 
 	// logger
 	Logger loggerInteface.Logger
+
+	// NumWorkers is num of gr in ConnectionPool
+	NumWorkers uint32
 }
 
 // Validate sets empty field to default config
@@ -68,6 +71,10 @@ func (o *Option) Validate() {
 
 	if o.CodecType == "" {
 		o.CodecType = constant.PBCodecName
+	}
+
+	if o.NumWorkers <= 0 {
+		o.NumWorkers = constant.DefaultNumWorkers
 	}
 }
 
@@ -145,5 +152,11 @@ func WithLogger(logger loggerInteface.Logger) OptionFunction {
 func WithSerializerTypeInWrapper(name string) OptionFunction {
 	return func(o *Option) {
 		o.SerializerTypeInWrapper = name
+	}
+}
+
+func WithNumWorker(numWorkers uint32) OptionFunction {
+	return func(o *Option) {
+		o.NumWorkers = numWorkers
 	}
 }

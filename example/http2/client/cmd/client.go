@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/dubbogo/triple/pkg/common/constant"
 )
 
 import (
@@ -20,13 +21,13 @@ func main() {
 }
 
 func testStream() {
-	client := http2.NewHttp2Client(tconfig.Option{Logger: default_logger.GetDefaultLogger()})
+	client := http2.NewClient(tconfig.Option{Logger: default_logger.GetDefaultLogger()})
 	header := make(map[string][]string)
 	header["header1"] = []string{"header1-val"}
 	header["header2"] = []string{"header2-val"}
 	sendChan := make(chan *bytes.Buffer)
 	dataChan, rspHeaderChan, err := client.StreamPost(serverAddr, "/stream", sendChan, &config.PostConfig{
-		ContentType: "application/grpc+proto",
+		ContentType: constant.TripleContentType,
 		BufferSize:  4096,
 		Timeout:     3,
 		HeaderField: header,
@@ -50,7 +51,7 @@ func testStream() {
 }
 
 func testUnary() {
-	client := http2.NewHttp2Client(tconfig.Option{Logger: default_logger.GetDefaultLogger()})
+	client := http2.NewClient(tconfig.Option{Logger: default_logger.GetDefaultLogger()})
 	header := make(map[string][]string)
 	header["header1"] = []string{"header1-val"}
 	header["header2"] = []string{"header2-val"}

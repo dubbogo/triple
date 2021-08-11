@@ -17,9 +17,6 @@
 
 package constant
 
-// TripleGrpcService is gRPC service, used to check impl
-// TripleGrpcService is gRPC service, used to check impl
-// TripleGrpcService is gRPC service, used to check impl
 // transfer
 const (
 	// TRIPLE is triple protocol name
@@ -92,4 +89,10 @@ const (
 	TripleTraceRPCID     = "tri-trace-rpcid"
 	TripleTraceProtoBin  = "tri-trace-proto-bin"
 	TripleUnitInfo       = "tri-unit-info"
+)
+
+// gr pool
+const (
+	// DefaultNumWorkers #workers for connection pool
+	DefaultNumWorkers = 720
 )
