@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
-	"strconv"
 	"time"
 )
 
@@ -204,13 +203,12 @@ Loop:
 				close(readDone)
 				break Loop
 			}
-		case tra := <-trailerChan:
-			trailer = tra
+		case trailer = <-trailerChan:
 			recvTrailer = true
-			http2StatusCode, _ := strconv.Atoi(tra.Get(constant.TrailerKeyHttp2Status))
-			if http2StatusCode != 0 {
-				// todo deal with http2 error
-			}
+			//http2StatusCode, _ := strconv.Atoi(tra.Get(constant.TrailerKeyHttp2Status))
+			//if http2StatusCode != 0 {
+			//	// todo deal with http2 error
+			//}
 			break Loop
 		case <-timeoutTicker:
 			// close reading loop ablove
