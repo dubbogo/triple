@@ -57,6 +57,9 @@ func main() {
 
 	// stream is not available for dubbo-java
 	//testSayHelloStream()
+
+	// high parallel and gr pool limitaion
+	//testSayHelloWithHighParallel()
 }
 
 func testSayHello() {
@@ -73,6 +76,7 @@ func testSayHello() {
 	if err != nil {
 		panic(err)
 	}
+	logger.Infof("get response user = %+v\n", user)
 }
 
 

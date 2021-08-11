@@ -132,7 +132,6 @@ func (hc *TripleController) GetHandler(rpcService interface{}) http2.Handler {
 				}
 			}
 			if err := hc.pool.Submit(sendToStream); err != nil {
-				// TODO: output logger
 				close(sendChan)
 				hc.option.Logger.Warnf("go routine pool full with error = %v", err)
 				hc.handleStatusAndResponse(status.New(codes.ResourceExhausted, fmt.Sprintf("go routine pool full with error = %v", err)), ctrlch)
@@ -239,6 +238,7 @@ func NewTripleController(opt *config.Option) (*TripleController, error) {
 			NumWorkers: int(opt.NumWorkers),
 			NumQueues:  runtime.NumCPU(),
 			QueueSize:  0,
+			Logger: opt.Logger,
 		}),
 	}
 	return h2c, nil
