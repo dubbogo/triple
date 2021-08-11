@@ -19,14 +19,13 @@ package stream
 
 import (
 	"bytes"
-	gxsync "github.com/dubbogo/gost/sync"
+	"context"
 )
 
 import (
+	gxsync "github.com/dubbogo/gost/sync"
 	h2Triple "github.com/dubbogo/net/http2/triple"
-
 	perrors "github.com/pkg/errors"
-
 	"google.golang.org/grpc"
 )
 
@@ -165,7 +164,7 @@ func (ss *serverStream) Close() {
 }
 
 // NewServerStreamForNonPB creates a new server stream for non-protobuf, i.e. hessian.
-func NewServerStreamForNonPB(header h2Triple.ProtocolHeader, opt *config.Option, pool gxsync.WorkerPool,
+func NewServerStreamForNonPB(ctx context.Context, header h2Triple.ProtocolHeader, opt *config.Option, pool gxsync.WorkerPool,
 	service common.TripleUnaryService, serializer common.TwoWayCodec) (*serverStream, error) {
 	baseStream := newBaseStream(service)
 
@@ -180,13 +179,11 @@ func NewServerStreamForNonPB(header h2Triple.ProtocolHeader, opt *config.Option,
 		return nil, err
 	}
 
-	serverStream.processor.runRPC()
-
-	return serverStream, nil
+	return serverStream, serverStream.processor.runRPC(ctx)
 }
 
 // NewServerStreamForPB creates a new server stream for protobuf.
-func NewServerStreamForPB(header h2Triple.ProtocolHeader, desc interface{}, opt *config.Option, pool gxsync.WorkerPool,
+func NewServerStreamForPB(ctx context.Context, header h2Triple.ProtocolHeader, desc interface{}, opt *config.Option, pool gxsync.WorkerPool,
 	service interface{}, serializer common.TwoWayCodec) (*serverStream, error) {
 	baseStream := newBaseStream(service)
 
@@ -211,9 +208,7 @@ func NewServerStreamForPB(header h2Triple.ProtocolHeader, desc interface{}, opt 
 		return nil, err
 	}
 
-	serverStream.processor.runRPC()
-
-	return serverStream, nil
+	return serverStream, serverStream.processor.runRPC(ctx)
 }
 
 // getService return RPCService that user defined and registered.

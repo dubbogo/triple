@@ -8,6 +8,4 @@ import (
 type ServerConfig struct {
 	Logger        logger.Logger
 	PathExtractor common.PathExtractor
-	// ConnectionPool config
-	NumWorkers int
 }

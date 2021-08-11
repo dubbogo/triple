@@ -23,6 +23,7 @@
 # >>>>> Java
 build
 target
+release
 !example/build
 # Compiled class file
 *.class

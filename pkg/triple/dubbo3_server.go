@@ -64,7 +64,6 @@ func (t *TripleServer) Start() {
 	t.http2Server = triHttp2.NewServer(t.opt.Location, triHttp2Conf.ServerConfig{
 		Logger:        t.opt.Logger,
 		PathExtractor: path.NewDefaultExtractor(),
-		NumWorkers:    t.opt.NumWorkers,
 	})
 
 	tripleCtl, err := http2.NewTripleController(t.opt)

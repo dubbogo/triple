@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/dubbogo/triple/pkg/common/constant"
 )
 
 import (
@@ -26,7 +27,7 @@ func testStream() {
 	header["header2"] = []string{"header2-val"}
 	sendChan := make(chan *bytes.Buffer)
 	dataChan, rspHeaderChan, err := client.StreamPost(serverAddr, "/stream", sendChan, &config.PostConfig{
-		ContentType: "application/grpc+proto",
+		ContentType: constant.TripleContentType,
 		BufferSize:  4096,
 		Timeout:     3,
 		HeaderField: header,

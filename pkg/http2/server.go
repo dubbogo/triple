@@ -16,8 +16,6 @@ import (
 	"github.com/dubbogo/net/http2"
 
 	perrors "github.com/pkg/errors"
-
-	gxsync "github.com/dubbogo/gost/sync"
 )
 
 import (
@@ -29,8 +27,6 @@ import (
 )
 
 const (
-	// defaultNumWorkers #workers for connection pool
-	defaultNumWorkers = 720
 	// DefaultMaxSleepTime max sleep interval in accept
 	DefaultMaxSleepTime = 1 * time.Second
 	// DefaultListenerTimeout tcp listener timeout
@@ -44,7 +40,7 @@ const (
 // errChan receives errors sent from upper layer
 type Handler func(path string, header http.Header, recvChan chan *bytes.Buffer,
 	sendChan chan *bytes.Buffer, ctrlChan chan http.Header,
-	errChan chan interface{}, pool gxsync.WorkerPool)
+	errChan chan interface{})
 
 // Server is the object that can be started and listening remote request
 type Server struct {
@@ -56,7 +52,6 @@ type Server struct {
 	logger         logger.Logger
 	frameHandler   common.PackageHandler
 	pathExtractor  common.PathExtractor
-	pool           gxsync.WorkerPool
 }
 
 // NewServer returns a server instance
@@ -70,12 +65,6 @@ func NewServer(address string, conf tConfig.ServerConfig) *Server {
 		conf.PathExtractor = &defaultPathExtractor{}
 	}
 
-	if conf.NumWorkers <= 0 {
-		conf.Logger.Debugf("the number of workers(=%d) for connection pool is invalid, use defaultNumWorkers(=%d)",
-			conf.NumWorkers, defaultNumWorkers)
-		conf.NumWorkers = defaultNumWorkers
-	}
-
 	return &Server{
 		frameHandler:   headerHandler,
 		address:        address,
@@ -84,12 +73,6 @@ func NewServer(address string, conf tConfig.ServerConfig) *Server {
 		httpHandlerMap: make(map[string]Handler),
 		pathExtractor:  conf.PathExtractor,
 		lock:           sync.Mutex{},
-		pool: gxsync.NewConnectionPool(gxsync.WorkerPoolConfig{
-			NumWorkers: conf.NumWorkers,
-			NumQueues:  runtime.NumCPU(),
-			QueueSize:  0,
-			Logger:     conf.Logger,
-		}),
 	}
 }
 
@@ -158,7 +141,7 @@ func (s *Server) run() {
 		}
 
 		// handle the connection
-		if err := s.pool.Submit(func() {
+		go func() {
 			defer func() {
 				if r := recover(); r != nil {
 					const size = 64 << 10
@@ -172,10 +155,7 @@ func (s *Server) run() {
 			if err := s.handleRawConn(c); err != nil && err != io.EOF {
 				s.logger.Error(" handle raw conn err = ", err)
 			}
-		}); err != nil {
-			s.logger.Warnf("connection closed: %v\n", err)
-			_ = c.Close()
-		}
+		}()
 	}
 }
 
@@ -199,10 +179,9 @@ func skipHeader(frameData []byte) ([]byte, uint32) {
 	return frameData[5:], length
 }
 
-func readSplitData(rBody io.ReadCloser, pool gxsync.WorkerPool) (chan *bytes.Buffer, error) {
+func readSplitData(rBody io.ReadCloser) chan *bytes.Buffer {
 	cbm := make(chan *bytes.Buffer)
-
-	fn := func() {
+	go func() {
 		buf := make([]byte, 4098) // todo configurable
 		for {
 			splitBuffer := bytes.NewBuffer(make([]byte, 0))
@@ -251,37 +230,18 @@ func readSplitData(rBody io.ReadCloser, pool gxsync.WorkerPool) (chan *bytes.Buf
 				}
 			}
 		}
-	}
-
-	if pool == nil {
-		go fn()
-	} else {
-		if err := pool.Submit(fn); err != nil {
-			return nil, err
-		}
-	}
-
-	return cbm, nil
+	}()
+	return cbm
 }
 
 func (s *Server) http2HandleFunction(wi http.ResponseWriter, r *http.Request) {
 	// body data from http
-	bodyCh, err := readSplitData(r.Body, s.pool)
+	bodyCh := readSplitData(r.Body)
 	sendChan := make(chan *bytes.Buffer)
 	ctrlChan := make(chan http.Header)
 	errChan := make(chan interface{})
 
 	w := wi.(*http2.Http2ResponseWriter)
-
-	if err != nil {
-		s.logger.Errorf("read request error: %v\n", err)
-		if err == gxsync.PoolBusyErr {
-			writeResponse(w, s.logger, 503, "server is busy")
-		} else {
-			writeResponse(w, s.logger, 500, err.Error())
-		}
-		return
-	}
 
 	path := r.URL.Path
 	headerField := r.Header
@@ -295,40 +255,29 @@ func (s *Server) http2HandleFunction(wi http.ResponseWriter, r *http.Request) {
 	}
 
 	if handler == nil {
-		// TODO: add error handler interface, let user define their handler
+		//todo add error handler interface, let user define their handler
 		err := perrors.Errorf("no handler was found for path: %s", path)
-		s.logger.Error(err)
+		s.logger.Warn(err)
 		writeResponse(w, s.logger, 400, err.Error())
 		return
 	}
 
-	handleRequest := func() {
-		handler(path, headerField, bodyCh, sendChan, ctrlChan, errChan, s.pool)
-	}
-	if err := s.pool.Submit(handleRequest); err != nil {
-		s.logger.Errorf("handling http request fails: %v\n", err)
-		if err == gxsync.PoolBusyErr {
-			writeResponse(w, s.logger, 503, "server is busy")
-		} else {
-			writeResponse(w, s.logger, 500, err.Error())
-		}
-		return
-	}
+	handler(path, headerField, bodyCh, sendChan, ctrlChan, errChan)
 
 	// first response
 	firstRspHeaderMap := <-ctrlChan
 	for k, v := range firstRspHeaderMap {
-		if len(v) > 0 && v[0] == "Trailer" {
-			w.Header().Add("Trailer", k)
+		if len(v) > 0 && v[0] == constant.TrailerKey {
+			w.Header().Add(constant.TrailerKey, k)
 		} else {
 			for _, vi := range v {
 				w.Header().Add(k, vi)
 			}
 		}
 	}
-	w.Header().Add("Trailer", constant.TrailerKeyHttp2Message)
-	w.Header().Add("Trailer", constant.TrailerKeyHttp2Status)
-	w.WriteHeader(200)
+	w.Header().Add(constant.TrailerKey, constant.TrailerKeyHttp2Message)
+	w.Header().Add(constant.TrailerKey, constant.TrailerKeyHttp2Status)
+	w.WriteHeader(http.StatusOK)
 	w.FlushHeader()
 	success := true
 	errorMsg := ""

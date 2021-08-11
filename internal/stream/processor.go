@@ -19,6 +19,7 @@ package stream
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"reflect"
 	"sync"
@@ -44,7 +45,7 @@ import (
 // processor is the interface, with func runRPC and close
 // It processes server RPC method that user defined and get response
 type processor interface {
-	runRPC()
+	runRPC(ctx context.Context) error
 	close()
 }
 
@@ -158,10 +159,12 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 }
 
 // runRPC is called by lower layer's stream
-func (p *unaryProcessor) runRPC() {
+func (p *unaryProcessor) runRPC(ctx context.Context) error {
 	recvChan := p.stream.GetRecv()
-	go func() {
+	if perr := p.pool.Submit(func() {
 		select {
+		case <-ctx.Done():
+			return
 		case <-p.done:
 			// in this case, server doesn't receive data but got close signal, it returns canceled code
 			p.opt.Logger.Warn("unaryProcessor closed by force")
@@ -191,7 +194,10 @@ func (p *unaryProcessor) runRPC() {
 			p.handleRPCSuccess(rspData)
 			return
 		}
-	}()
+	}); perr != nil {
+		return status.Errorf(codes.ResourceExhausted, "go routine pool full with error = %v", perr)
+	}
+	return nil
 }
 
 // streamingProcessor used to process streaming invocation
@@ -217,10 +223,10 @@ func newStreamingProcessor(s *serverStream, desc grpc.StreamDesc, serializer com
 }
 
 // runRPC called by stream
-func (sp *streamingProcessor) runRPC() {
+func (sp *streamingProcessor) runRPC(ctx context.Context) error {
 	serverUserStream := newServerUserStream(sp.stream, sp.twoWayCodec, sp.opt)
 
-	handleRPC := func() {
+	if perr := sp.pool.Submit(func() {
 		if err := sp.streamDesc.Handler(sp.stream.getService(), serverUserStream); err != nil {
 			sp.handleRPCErr(err)
 			return
@@ -228,9 +234,8 @@ func (sp *streamingProcessor) runRPC() {
 		// for stream rpc, processor should send CloseMsg to lower stream layer to call close
 		// but unary rpc not, unary rpc processor only send data to stream layer
 		sp.handleRPCSuccess(nil)
+	}); perr != nil {
+		return status.Errorf(codes.ResourceExhausted, "go routine pool full with error = %v", perr)
 	}
-
-	if perr := sp.pool.Submit(handleRPC); perr != nil {
-		sp.handleRPCErr(perr)
-	}
+	return nil
 }

@@ -3,9 +3,9 @@
     <module name="triple" />
     <working_directory value="$PROJECT_DIR$" />
     <kind value="PACKAGE" />
-    <filePath value="$PROJECT_DIR$/example/http2/client/client.go" />
-    <package value="github.com/dubbogo/triple/example/http2/client" />
+    <package value="github.com/dubbogo/triple/example/http2/client/cmd" />
     <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/example/http2/client/client.go" />
     <method v="2" />
   </configuration>
 </component>

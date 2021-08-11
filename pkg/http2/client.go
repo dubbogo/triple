@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
-	"strconv"
 	"time"
 )
 
@@ -85,7 +84,7 @@ func (h *Client) StreamPost(addr, path string, sendChan chan *bytes.Buffer, opts
 			close(closeChan)
 			return
 		}
-		ch, _ := readSplitData(rsp.Body, nil)
+		ch := readSplitData(rsp.Body)
 	Loop:
 		for {
 			select {
@@ -204,15 +203,13 @@ Loop:
 				close(readDone)
 				break Loop
 			}
-		case tra := <-trailerChan:
-			trailer = tra
+		case trailer = <-trailerChan:
 			recvTrailer = true
-			http2StatusCode, _ := strconv.Atoi(tra.Get(constant.TrailerKeyHttp2Status))
-			if http2StatusCode != 0 {
-				// todo deal with http2 error
-				break Loop
-			}
-
+			//http2StatusCode, _ := strconv.Atoi(tra.Get(constant.TrailerKeyHttp2Status))
+			//if http2StatusCode != 0 {
+			//	// todo deal with http2 error
+			//}
+			break Loop
 		case <-timeoutTicker:
 			// close reading loop ablove
 			close(readDone)

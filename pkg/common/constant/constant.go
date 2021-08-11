@@ -17,7 +17,6 @@
 
 package constant
 
-// TripleGrpcService is gRPC service, used to check impl
 // transfer
 const (
 	// TRIPLE is triple protocol name
@@ -52,6 +51,7 @@ type TripleCtxKey string
 
 const (
 	InterfaceKey = TripleCtxKey("interface")
+	TrailerKey   = "Trailer"
 )
 
 // triple Header
@@ -64,6 +64,9 @@ const (
 
 	// TrailerKeyGrpcMessage is a trailer header field to response grpc error message.
 	TrailerKeyGrpcMessage = "grpc-message"
+
+	// TrailerKeyGrpcDetailsBin is a trailer header field to response grpc details bin message encoded by base64
+	TrailerKeyGrpcDetailsBin = "grpc-status-details-bin"
 
 	// TrailerKeyTraceProtoBin is triple trailer header
 	TrailerKeyTraceProtoBin = "trace-proto-bin"
@@ -86,4 +89,10 @@ const (
 	TripleTraceRPCID     = "tri-trace-rpcid"
 	TripleTraceProtoBin  = "tri-trace-proto-bin"
 	TripleUnitInfo       = "tri-unit-info"
+)
+
+// gr pool
+const (
+	// DefaultNumWorkers #workers for connection pool
+	DefaultNumWorkers = 720
 )

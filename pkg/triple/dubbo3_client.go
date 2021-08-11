@@ -19,7 +19,6 @@ package triple
 
 import (
 	"context"
-	"github.com/dubbogo/triple/internal/http2"
 	"reflect"
 	"sync"
 )
@@ -29,6 +28,7 @@ import (
 )
 
 import (
+	"github.com/dubbogo/triple/internal/http2"
 	"github.com/dubbogo/triple/internal/tools"
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
