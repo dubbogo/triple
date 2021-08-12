@@ -19,8 +19,11 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 )
@@ -36,20 +39,28 @@ import (
 	_ "dubbo.apache.org/dubbo-go/v3/registry/nacos"
 	_ "dubbo.apache.org/dubbo-go/v3/registry/protocol"
 	_ "dubbo.apache.org/dubbo-go/v3/registry/zookeeper"
+
+	_ "github.com/dubbogo/triple/pkg/triple"
 )
 
 import (
 	"github.com/dubbogo/triple/example/dubbo/go-server/pkg"
-	_ "github.com/dubbogo/triple/pkg/triple"
 )
 
 var (
 	survivalTimeout = int(3 * time.Second)
 )
 
+func init() {
+	runtime.SetMutexProfileFraction(1)
+}
+
 // need to setup environment variable "CONF_PROVIDER_FILE_PATH" to "conf/server.yml" before run
 func main() {
 	config.SetProviderService(pkg.NewGreeterProvider())
+	go func() {
+		_ = http.ListenAndServe("0.0.0.0:6060", nil)
+	}()
 	config.Load()
 	initSignal()
 }

@@ -2,6 +2,7 @@ package http2
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -179,7 +180,7 @@ func skipHeader(frameData []byte) ([]byte, uint32) {
 	return frameData[5:], length
 }
 
-func readSplitData(rBody io.ReadCloser) chan *bytes.Buffer {
+func readSplitData(ctx context.Context, rBody io.ReadCloser) chan *bytes.Buffer {
 	cbm := make(chan *bytes.Buffer)
 	go func() {
 		buf := make([]byte, 4098) // todo configurable
@@ -224,7 +225,14 @@ func readSplitData(rBody io.ReadCloser) chan *bytes.Buffer {
 					if err != nil {
 						fmt.Printf("read SplitedDatas error = %v\n", err)
 					}
-					cbm <- bytes.NewBuffer(allDataBody)
+					select {
+					case <-ctx.Done():
+						close(cbm)
+						return
+					default:
+						cbm <- bytes.NewBuffer(allDataBody)
+					}
+
 					// temp data is sent, and reset wanting data size
 					fromFrameHeaderDataSize = 0
 				}
@@ -236,7 +244,15 @@ func readSplitData(rBody io.ReadCloser) chan *bytes.Buffer {
 
 func (s *Server) http2HandleFunction(wi http.ResponseWriter, r *http.Request) {
 	// body data from http
-	bodyCh := readSplitData(r.Body)
+	ctx, cancel := context.WithCancel(context.Background())
+	bodyCh := readSplitData(ctx, r.Body)
+	defer func() {
+		cancel()
+		select {
+		case <-bodyCh:
+		default:
+		}
+	}()
 	sendChan := make(chan *bytes.Buffer)
 	ctrlChan := make(chan http.Header)
 	errChan := make(chan interface{})

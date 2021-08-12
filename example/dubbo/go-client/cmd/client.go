@@ -20,6 +20,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -47,10 +50,13 @@ var greeterProvider = new(pkg.GreeterClientImpl)
 
 func init() {
 	config.SetConsumerService(greeterProvider)
+	runtime.SetMutexProfileFraction(1)
 }
-
 // need to setup environment variable "CONF_CONSUMER_FILE_PATH" to "conf/client.yml" before run
 func main() {
+	go func() {
+		_ = http.ListenAndServe("0.0.0.0:6061", nil)
+	}()
 	config.Load()
 	time.Sleep(time.Second * 3)
 	testSayHello()
@@ -94,7 +100,7 @@ func testSayHelloWithHighParallel() {
 		wg := sync.WaitGroup{}
 		goodCounter := atomic.Uint32{}
 		badCounter := atomic.Uint32{}
-		for i := 0; i < 1000; i ++{
+		for i := 0; i < 2000; i ++{
 			wg.Add(1)
 			go func() {
 				defer wg.Done()

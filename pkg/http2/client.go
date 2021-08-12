@@ -2,6 +2,7 @@ package http2
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
@@ -84,7 +85,7 @@ func (h *Client) StreamPost(addr, path string, sendChan chan *bytes.Buffer, opts
 			close(closeChan)
 			return
 		}
-		ch := readSplitData(rsp.Body)
+		ch := readSplitData(context.Background(), rsp.Body)
 	Loop:
 		for {
 			select {
