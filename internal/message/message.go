@@ -64,8 +64,8 @@ type MsgQueue struct {
 	c chan Message
 }
 
-// NewBufferMsgChain returns new MsgQueue
-func NewBufferMsgChain() *MsgQueue {
+// NewBufferMsgQueue returns new MsgQueue
+func NewBufferMsgQueue() *MsgQueue {
 	b := &MsgQueue{
 		c: make(chan Message),
 	}

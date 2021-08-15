@@ -271,33 +271,33 @@ func (hc *TripleController) newServerStreamFromTripleHeader(ctx context.Context,
 			return nil, status.Err(codes.Internal, "can't assert impl of interface "+interfaceKey+" to TripleGrpcService")
 		}
 		// pb twoWayCodec needs grpc.Desc to do method discovery, allowing unary and streaming invocation
-		mdMap, strMap, err := getMethodAndStreamDescMap(service)
+		methodMap, streamMap, err := getMethodAndStreamDescMap(service)
 		if err != nil {
 			hc.option.Logger.Error("new H2 controller error:", err)
 			return nil, status.Err(codes.Unimplemented, err.Error())
 		}
-		unaryRPCDiscovery, okm := mdMap[methodName]
-		streamRPCDiscovery, oks := strMap[methodName]
-		if !okm && !oks {
-			hc.option.Logger.Errorf("method name %s not found in desc\n", methodName)
-			return nil, status.Err(codes.Unimplemented, "method name %s not found in desc")
-		}
+		unaryRPCDiscovery, unaryOk := methodMap[methodName]
+		streamRPCDiscovery, streamOk := streamMap[methodName]
 
-		if okm {
+		if unaryOk {
 			newstm, err = stream.NewServerStreamForPB(ctx, triHeader, unaryRPCDiscovery, hc.option,
 				pool, service, hc.twoWayCodec)
 			if err != nil {
 				hc.option.Logger.Errorf("newServerStream error", err)
 				return nil, err
 			}
-		} else {
+		} else if streamOk {
 			newstm, err = stream.NewServerStreamForPB(ctx, triHeader, streamRPCDiscovery, hc.option,
 				pool, service, hc.twoWayCodec)
 			if err != nil {
 				hc.option.Logger.Error("newServerStream error", err)
 				return nil, err
 			}
+		} else {
+			hc.option.Logger.Errorf("method name %s not found in desc\n", methodName)
+			return nil, status.Err(codes.Unimplemented, "method name %s not found in desc")
 		}
+
 	} else {
 		service, ok := rpcService.(common.TripleUnaryService)
 		if !ok {
