@@ -19,60 +19,56 @@ func main() {
 	})
 	svr.RegisterHandler("/unary", func(path string, header http.Header, recvChan chan *bytes.Buffer,
 		sendChan chan *bytes.Buffer, ctrlCh chan http.Header, errCh chan interface{}) {
-		go func() {
-			fmt.Println("path = ", path)
-			fmt.Println("header = ", header)
+		fmt.Println("path = ", path)
+		fmt.Println("header = ", header)
 
-			rspHeader := make(map[string][]string)
-			rspHeader["content-type"] = []string{"application/grpc+proto"}
-			rspHeader["grpc-status"] = []string{"Trailer"}
-			rspHeader["grpc-message"] = []string{"Trailer"}
-			rspHeader["tri-bin"] = []string{"Trailer"}
-			ctrlCh <- rspHeader
+		rspHeader := make(map[string][]string)
+		rspHeader["content-type"] = []string{"application/grpc+proto"}
+		rspHeader["grpc-status"] = []string{"Trailer"}
+		rspHeader["grpc-message"] = []string{"Trailer"}
+		rspHeader["tri-bin"] = []string{"Trailer"}
+		ctrlCh <- rspHeader
 
-			body := <-recvChan
-			fmt.Println(body)
-			sendChan <- body
-			close(sendChan)
-			time.Sleep(time.Second)
+		body := <-recvChan
+		fmt.Println(body)
+		sendChan <- body
+		close(sendChan)
+		time.Sleep(time.Second)
 
-			rspHeader2 := make(map[string][]string)
-			rspHeader2["grpc-status"] = []string{"grpc-status-val"}
-			rspHeader2["grpc-message"] = []string{"grpc-message-val"}
-			rspHeader2["tri-bin"] = []string{"tri-bin-val"}
-			ctrlCh <- rspHeader2
-		}()
+		rspHeader2 := make(map[string][]string)
+		rspHeader2["grpc-status"] = []string{"grpc-status-val"}
+		rspHeader2["grpc-message"] = []string{"grpc-message-val"}
+		rspHeader2["tri-bin"] = []string{"tri-bin-val"}
+		ctrlCh <- rspHeader2
 	})
 
 	svr.RegisterHandler("/stream",
 		func(path string, header http.Header, recvChan chan *bytes.Buffer, sendChan chan *bytes.Buffer,
 			ctrlCh chan http.Header, errCh chan interface{}) {
-			go func() {
-				fmt.Println("path = ", path)
-				fmt.Println("header = ", header)
+		fmt.Println("path = ", path)
+		fmt.Println("header = ", header)
 
-				rspHeader := make(map[string][]string)
-				rspHeader["content-type"] = []string{"application/grpc+proto"}
-				rspHeader["grpc-status"] = []string{"Trailer"}
-				rspHeader["grpc-message"] = []string{"Trailer"}
-				rspHeader["tri-bin"] = []string{"Trailer"}
-				ctrlCh <- rspHeader
+		rspHeader := make(map[string][]string)
+		rspHeader["content-type"] = []string{"application/grpc+proto"}
+		rspHeader["grpc-status"] = []string{"Trailer"}
+		rspHeader["grpc-message"] = []string{"Trailer"}
+		rspHeader["tri-bin"] = []string{"Trailer"}
+		ctrlCh <- rspHeader
 
-				body := bytes.NewBuffer([]byte("hello"))
-				for string(body.Bytes()) == "hello" {
-					body = <-recvChan
-					fmt.Println(body)
-					sendChan <- body
-				}
-				close(sendChan)
-				time.Sleep(time.Second)
+		body := bytes.NewBuffer([]byte("hello"))
+		for string(body.Bytes()) == "hello" {
+			body = <-recvChan
+			fmt.Println(body)
+			sendChan <- body
+		}
+		close(sendChan)
+		time.Sleep(time.Second)
 
-				rspHeader2 := make(map[string][]string)
-				rspHeader2["grpc-status"] = []string{"grpc-status-val"}
-				rspHeader2["grpc-message"] = []string{"grpc-message-val"}
-				rspHeader2["tri-bin"] = []string{"tri-bin-val"}
-				ctrlCh <- rspHeader2
-			}()
+		rspHeader2 := make(map[string][]string)
+		rspHeader2["grpc-status"] = []string{"grpc-status-val"}
+		rspHeader2["grpc-message"] = []string{"grpc-message-val"}
+		rspHeader2["tri-bin"] = []string{"tri-bin-val"}
+		ctrlCh <- rspHeader2
 	})
 	svr.Start()
 	select {}

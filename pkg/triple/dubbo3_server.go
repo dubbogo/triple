@@ -34,7 +34,6 @@ import (
 type TripleServer struct {
 	http2Server   *triHttp2.Server
 	rpcServiceMap *sync.Map
-	done          chan struct{}
 
 	// config
 	opt *config.Option
@@ -46,7 +45,6 @@ func NewTripleServer(serviceMap *sync.Map, opt *config.Option) *TripleServer {
 	opt = tools.AddDefaultOption(opt)
 	return &TripleServer{
 		rpcServiceMap: serviceMap,
-		done:          make(chan struct{}, 1),
 		opt:           opt,
 	}
 }
@@ -54,7 +52,6 @@ func NewTripleServer(serviceMap *sync.Map, opt *config.Option) *TripleServer {
 // Stop
 func (t *TripleServer) Stop() {
 	t.http2Server.Stop()
-	t.done <- struct{}{}
 }
 
 // Start can start a triple server
@@ -62,8 +59,9 @@ func (t *TripleServer) Start() {
 	t.opt.Logger.Debug("tripleServer Start at ", t.opt.Location)
 
 	t.http2Server = triHttp2.NewServer(t.opt.Location, triHttp2Conf.ServerConfig{
-		Logger:        t.opt.Logger,
-		PathExtractor: path.NewDefaultExtractor(),
+		Logger:                 t.opt.Logger,
+		PathExtractor:          path.NewDefaultExtractor(),
+		HandlerGRManagedByUser: true,
 	})
 
 	tripleCtl, err := http2.NewTripleController(t.opt)
