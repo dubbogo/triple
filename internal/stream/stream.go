@@ -144,8 +144,8 @@ func (s *baseStream) Close() {
 func newBaseStream(service interface{}) *baseStream {
 	// stream and pkgHeader are the same level
 	return &baseStream{
-		recvBuf: message.NewBufferMsgChain(),
-		sendBuf: message.NewBufferMsgChain(),
+		recvBuf: message.NewBufferMsgQueue(),
+		sendBuf: message.NewBufferMsgQueue(),
 		service: service,
 		splitBuffer: message.Message{
 			Buffer: bytes.NewBuffer(make([]byte, 0)),
