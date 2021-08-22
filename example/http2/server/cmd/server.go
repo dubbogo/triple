@@ -73,7 +73,7 @@ func main() {
 				rspHeader2["tri-bin"] = []string{"tri-bin-val"}
 				ctrlCh <- rspHeader2
 			}()
-	})
+		})
 	svr.Start()
 	select {}
 }
