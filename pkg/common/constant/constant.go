@@ -50,8 +50,9 @@ const (
 type TripleCtxKey string
 
 const (
-	InterfaceKey = TripleCtxKey("interface")
-	TrailerKey   = "Trailer"
+	InterfaceKey     = TripleCtxKey("interface")
+	CtxAttachmentKey = TripleCtxKey("attachment")
+	TrailerKey       = "Trailer"
 )
 
 // triple Header
@@ -83,6 +84,7 @@ const (
 	TripleContentType    = "application/grpc+proto"
 	TripleUserAgent      = "grpc-go/1.35.0-dev"
 	TripleServiceVersion = "tri-service-version"
+	TripleAttachement    = "tri-attachment"
 	TripleServiceGroup   = "tri-service-group"
 	TripleRequestID      = "tri-req-id"
 	TripleTraceID        = "tri-trace-traceid"

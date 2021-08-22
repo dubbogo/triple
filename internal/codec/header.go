@@ -53,6 +53,7 @@ type TripleHeader struct {
 	GrpcStatus     string
 	GrpcMessage    string
 	Authorization  []string
+	Attachment     string
 }
 
 func NewTripleHeader(path string, header http.Header) h2Triple.ProtocolHeader {
@@ -78,6 +79,8 @@ func NewTripleHeader(path string, header http.Header) h2Triple.ProtocolHeader {
 			tripleHeader.ContentType = v[0]
 		case textproto.CanonicalMIMEHeaderKey("authorization"):
 			tripleHeader.ContentType = v[0]
+		case textproto.CanonicalMIMEHeaderKey(constant.TripleAttachement):
+			tripleHeader.Attachment = v[0]
 		// todo: usage of these part of fields needs to be discussed later
 		//case "grpc-encoding":
 		//case "grpc-status":
@@ -104,6 +107,7 @@ func (t *TripleHeader) FieldToCtx() context.Context {
 	ctx = context.WithValue(ctx, constant.TripleCtxKey(constant.TrailerKeyGrpcStatus), t.GrpcStatus)
 	ctx = context.WithValue(ctx, constant.TripleCtxKey(constant.TrailerKeyGrpcMessage), t.GrpcMessage)
 	ctx = context.WithValue(ctx, constant.TripleCtxKey("authorization"), t.Authorization)
+	ctx = context.WithValue(ctx, constant.CtxAttachmentKey, t.Attachment)
 	return ctx
 }
 
@@ -126,21 +130,24 @@ func NewTripleHeaderHandler(opt *config.Option, ctx context.Context) h2Triple.Pr
 // it parse field of opt and ctx to HTTP2 Header field, developer must assure "tri-" prefix field be string
 // if not, it will cause panic!
 func (t *TripleHeaderHandler) WriteTripleReqHeaderField(header http.Header) http.Header {
-
+	// set triple user agent, to be capitabile with grpc
 	header["user-agent"] = []string{constant.TripleUserAgent}
+
 	// get from ctx
-	//header["tri-service-version"] = []string{getCtxVaSave(t.Ctx, "tri-service-version")}
-	//header["tri-service-group"] = []string{getCtxVaSave(t.Ctx, "tri-service-group")}
-
-	// now we choose get from opt
-	header[constant.TripleServiceVersion] = []string{t.Opt.HeaderAppVersion}
-	header[constant.TripleServiceGroup] = []string{t.Opt.HeaderGroup}
-
+	header[constant.TripleAttachement] = []string{getCtxVaSave(t.Ctx, string(constant.CtxAttachmentKey))}
 	header[constant.TripleRequestID] = []string{getCtxVaSave(t.Ctx, constant.TripleRequestID)}
 	header[constant.TripleTraceID] = []string{getCtxVaSave(t.Ctx, constant.TripleTraceID)}
 	header[constant.TripleTraceRPCID] = []string{getCtxVaSave(t.Ctx, constant.TripleTraceRPCID)}
 	header[constant.TripleTraceProtoBin] = []string{getCtxVaSave(t.Ctx, constant.TripleTraceProtoBin)}
 	header[constant.TripleUnitInfo] = []string{getCtxVaSave(t.Ctx, constant.TripleUnitInfo)}
+	//header["tri-service-version"] = []string{getCtxVaSave(t.Ctx, "tri-service-version")}
+	//header["tri-service-group"] = []string{getCtxVaSave(t.Ctx, "tri-service-group")}
+
+	// get from opt
+	header[constant.TripleServiceVersion] = []string{t.Opt.HeaderAppVersion}
+	header[constant.TripleServiceGroup] = []string{t.Opt.HeaderGroup}
+
+	// set authorization key
 	if v, ok := t.Ctx.Value("authorization").([]string); !ok || len(v) != 2 {
 		return header
 	} else {

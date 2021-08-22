@@ -23,6 +23,7 @@ import (
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
 	"github.com/dubbogo/triple/pkg/common/logger"
+	"github.com/dubbogo/triple/pkg/common/logger/default_logger"
 	tconfig "github.com/dubbogo/triple/pkg/config"
 	tConfig "github.com/dubbogo/triple/pkg/http2/config"
 )
@@ -45,14 +46,15 @@ type Handler func(path string, header http.Header, recvChan chan *bytes.Buffer,
 
 // Server is the object that can be started and listening remote request
 type Server struct {
-	lst            net.Listener
-	lock           sync.Mutex
-	httpHandlerMap map[string]Handler
-	done           chan struct{}
-	address        string
-	logger         logger.Logger
-	frameHandler   common.PackageHandler
-	pathExtractor  common.PathExtractor
+	lst                  net.Listener
+	lock                 sync.Mutex
+	httpHandlerMap       map[string]Handler
+	done                 chan struct{}
+	address              string
+	logger               logger.Logger
+	frameHandler         common.PackageHandler
+	pathExtractor        common.PathExtractor
+	handleGRMangedByUser bool
 }
 
 // NewServer returns a server instance
@@ -66,14 +68,19 @@ func NewServer(address string, conf tConfig.ServerConfig) *Server {
 		conf.PathExtractor = &defaultPathExtractor{}
 	}
 
+	if conf.Logger == nil {
+		conf.Logger = default_logger.GetDefaultLogger()
+	}
+
 	return &Server{
-		frameHandler:   headerHandler,
-		address:        address,
-		logger:         conf.Logger,
-		done:           make(chan struct{}),
-		httpHandlerMap: make(map[string]Handler),
-		pathExtractor:  conf.PathExtractor,
-		lock:           sync.Mutex{},
+		frameHandler:         headerHandler,
+		address:              address,
+		logger:               conf.Logger,
+		done:                 make(chan struct{}),
+		httpHandlerMap:       make(map[string]Handler),
+		pathExtractor:        conf.PathExtractor,
+		handleGRMangedByUser: conf.HandlerGRManagedByUser,
+		lock:                 sync.Mutex{},
 	}
 }
 
@@ -278,7 +285,14 @@ func (s *Server) http2HandleFunction(wi http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler(path, headerField, bodyCh, sendChan, ctrlChan, errChan)
+	if s.handleGRMangedByUser {
+		s.logger.Debug("use http2 handleGRMangedByUser mod, pls ensure your http2 handler could start new gr.")
+		handler(path, headerField, bodyCh, sendChan, ctrlChan, errChan)
+	} else {
+		go func() {
+			handler(path, headerField, bodyCh, sendChan, ctrlChan, errChan)
+		}()
+	}
 
 	// first response
 	firstRspHeaderMap := <-ctrlChan

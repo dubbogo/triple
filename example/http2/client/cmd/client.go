@@ -3,10 +3,10 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/dubbogo/triple/pkg/common/constant"
 )
 
 import (
+	"github.com/dubbogo/triple/pkg/common/constant"
 	"github.com/dubbogo/triple/pkg/common/logger/default_logger"
 	tconfig "github.com/dubbogo/triple/pkg/config"
 	"github.com/dubbogo/triple/pkg/http2"
