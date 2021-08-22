@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"github.com/dubbogo/triple/pkg/common/logger/default_logger"
 	"io"
 	"net"
 	"net/http"
@@ -24,6 +23,7 @@ import (
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
 	"github.com/dubbogo/triple/pkg/common/logger"
+	"github.com/dubbogo/triple/pkg/common/logger/default_logger"
 	tconfig "github.com/dubbogo/triple/pkg/config"
 	tConfig "github.com/dubbogo/triple/pkg/http2/config"
 )
