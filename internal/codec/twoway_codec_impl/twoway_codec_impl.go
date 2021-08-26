@@ -48,7 +48,7 @@ func NewPBWrapperTwoWayCodec(codecName constant.CodecType) (common.TwoWayCodec, 
 	if err != nil {
 		return nil, err
 	}
-	pbCodec, err := common.GetTripleCodec(constant.CodecType("protobuf"))
+	pbCodec, err := common.GetTripleCodec("protobuf")
 	if err != nil {
 		return nil, err
 	}
@@ -124,6 +124,9 @@ func (h *PBWrapperTwoWayCodec) UnmarshalResponse(data []byte, v interface{}) err
 	err := h.pbCodec.Unmarshal(data, &wrapperResponse)
 	if err != nil {
 		return err
+	}
+	if v == nil { // empty respose
+		return nil
 	}
 	return h.codec.Unmarshal(wrapperResponse.Data, v)
 }

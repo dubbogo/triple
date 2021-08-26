@@ -18,14 +18,21 @@
 package codec_impl
 
 import (
+	"encoding/json"
+)
+
+import (
 	hessian "github.com/apache/dubbo-go-hessian2"
 
 	"github.com/golang/protobuf/proto"
+
+	perrors "github.com/pkg/errors"
 
 	mp "github.com/ugorji/go/codec"
 )
 
 import (
+	proto2 "github.com/dubbogo/triple/internal/codec/proto"
 	"github.com/dubbogo/triple/internal/tools"
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
@@ -35,6 +42,7 @@ func init() {
 	common.SetTripleCodec(constant.PBCodecName, NewProtobufCodec)
 	common.SetTripleCodec(constant.HessianCodecName, NewHessianCodec)
 	common.SetTripleCodec(constant.MsgPackCodecName, NewMsgPackCodec)
+	common.SetTripleCodec(constant.JSONMapStructCodec, NewJSONMapStruct)
 }
 
 // MsgPackCodec is the msgpack impl of common.Codec interface
@@ -101,4 +109,61 @@ func (h *HessianCodeC) Unmarshal(data []byte, v interface{}) error {
 // NewHessianCodec returns new HessianCodeC
 func NewHessianCodec() common.Codec {
 	return &HessianCodeC{}
+}
+
+// JSONMapStructCodec is the JSON impl of Codec interface
+type JSONMapStructCodec struct{}
+
+// Marshal serialize interface @v to bytes
+func (h *JSONMapStructCodec) Marshal(v interface{}) ([]byte, error) {
+	if byt, err := json.Marshal(v); err != nil {
+		return nil, perrors.WithStack(err)
+	} else {
+		return byt, nil
+	}
+}
+
+// Unmarshal deserialize @data to interface
+func (h *JSONMapStructCodec) Unmarshal(data []byte, v interface{}) error {
+	var t map[string]interface{}
+	if err := json.Unmarshal(data, &t); err != nil {
+		return perrors.WithStack(err)
+	}
+	return hessian.ReflectResponse(v, t)
+}
+
+// NewJSONMapStruct returns new JSONMapStructCodec
+func NewJSONMapStruct() common.Codec {
+	return &JSONMapStructCodec{}
+}
+
+func NewGenericCodec() (common.GenericCodec, error) {
+	return &GenericCodec{
+		codec: NewProtobufCodec(),
+	}, nil
+}
+
+// GenericCodec is pb impl of TwoWayCodec
+type GenericCodec struct {
+	codec common.Codec
+}
+
+// UnmarshalRequest unmarshal bytes @data to interface
+func (h *GenericCodec) UnmarshalRequest(data []byte) ([]interface{}, error) {
+	wrapperRequest := proto2.TripleRequestWrapper{}
+	err := h.codec.Unmarshal(data, &wrapperRequest)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]interface{}, 0)
+
+	for _, value := range wrapperRequest.Args {
+		decoder := hessian.NewDecoder(value)
+		val, err := decoder.Decode()
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, val)
+	}
+	return result, nil
 }

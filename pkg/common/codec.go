@@ -66,3 +66,7 @@ type TwoWayCodec interface {
 	UnmarshalRequest(data []byte, v interface{}) error
 	UnmarshalResponse(data []byte, v interface{}) error
 }
+
+type GenericCodec interface {
+	UnmarshalRequest(data []byte) ([]interface{}, error)
+}

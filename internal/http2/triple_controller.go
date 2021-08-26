@@ -40,6 +40,7 @@ import (
 
 import (
 	"github.com/dubbogo/triple/internal/codec"
+	"github.com/dubbogo/triple/internal/codec/codec_impl"
 	codecImpl "github.com/dubbogo/triple/internal/codec/twoway_codec_impl"
 	"github.com/dubbogo/triple/internal/codes"
 	"github.com/dubbogo/triple/internal/message"
@@ -71,6 +72,8 @@ type TripleController struct {
 
 	twoWayCodec common.TwoWayCodec
 
+	genericCodec common.GenericCodec
+
 	http2Client *http2.Client
 
 	pool gxsync.WorkerPool
@@ -89,6 +92,8 @@ func (hc *TripleController) GetHandler(rpcService interface{}) http2.Handler {
 			grpcCode is uint type and show grpc status code
 			traceProtoBin is uint type, triple defined header.
 		*/
+
+		hc.option.Logger.Debugf("receive http2 path = %s", path)
 
 		if err := hc.pool.Submit(func() {
 			var (
@@ -229,12 +234,15 @@ func NewTripleController(opt *config.Option) (*TripleController, error) {
 		return nil, err
 	}
 
+	genericCodec, _ := codec_impl.NewGenericCodec()
+
 	h2c := &TripleController{
-		pkgHandler:  pkgHandler,
-		option:      opt,
-		address:     opt.Location,
-		closeChan:   make(chan struct{}),
-		twoWayCodec: twowayCodec,
+		pkgHandler:   pkgHandler,
+		option:       opt,
+		address:      opt.Location,
+		closeChan:    make(chan struct{}),
+		twoWayCodec:  twowayCodec,
+		genericCodec: genericCodec,
 		// todo server end, this is useless
 		http2Client: http2.NewClient(config.Option{Logger: opt.Logger}),
 		pool: gxsync.NewConnectionPool(gxsync.WorkerPoolConfig{
@@ -308,7 +316,7 @@ func (hc *TripleController) newServerStreamFromTripleHeader(ctx context.Context,
 		}
 		// hessian twoWayCodec doesn't need to use grpc.Desc, and now only support unary invocation
 		var err error
-		newstm, err = stream.NewServerStreamForNonPB(ctx, triHeader, hc.option, pool, service, hc.twoWayCodec)
+		newstm, err = stream.NewServerStreamForNonPB(ctx, triHeader, hc.option, pool, service, hc.twoWayCodec, hc.genericCodec)
 		if err != nil {
 			hc.option.Logger.Errorf("hessian server new server stream error = %v", err)
 			return nil, err
