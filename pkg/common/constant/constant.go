@@ -44,6 +44,9 @@ const (
 
 	// MsgPackCodecName is the serializer with pb wrapped with msgpack
 	MsgPackCodecName = CodecType("msgpack")
+
+	// JSONMapStructCodec is the serializer jsonCodec
+	JSONMapStructCodec = CodecType("jsonMapStruct")
 )
 
 // TripleCtxKey is typ of content key

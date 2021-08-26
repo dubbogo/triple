@@ -168,7 +168,7 @@ func (ss *serverStream) Close() {
 
 // NewServerStreamForNonPB creates a new server stream for non-protobuf, i.e. hessian.
 func NewServerStreamForNonPB(ctx context.Context, header h2Triple.ProtocolHeader, opt *config.Option, pool gxsync.WorkerPool,
-	service common.TripleUnaryService, serializer common.TwoWayCodec) (*serverStream, error) {
+	service common.TripleUnaryService, serializer common.TwoWayCodec, genericCodec common.GenericCodec) (*serverStream, error) {
 	baseStream := newBaseStream(service)
 
 	serverStream := &serverStream{
@@ -176,7 +176,7 @@ func NewServerStreamForNonPB(ctx context.Context, header h2Triple.ProtocolHeader
 		header:     header,
 	}
 	var err error
-	serverStream.processor, err = newUnaryProcessor(serverStream, grpc.MethodDesc{}, serializer, pool, opt)
+	serverStream.processor, err = newUnaryProcessor(serverStream, grpc.MethodDesc{}, serializer, genericCodec, pool, opt)
 	if err != nil {
 		opt.Logger.Errorf("new processor error with err = %s\n", err)
 		return nil, err
@@ -199,7 +199,7 @@ func NewServerStreamForPB(ctx context.Context, header h2Triple.ProtocolHeader, d
 	var err error
 	if methodDesc, ok := desc.(grpc.MethodDesc); ok {
 		// pkgHandler and processor are the same level
-		serverStream.processor, err = newUnaryProcessor(serverStream, methodDesc, serializer, pool, opt)
+		serverStream.processor, err = newUnaryProcessor(serverStream, methodDesc, serializer, nil, pool, opt)
 	} else if streamDesc, ok := desc.(grpc.StreamDesc); ok {
 		serverStream.processor, err = newStreamingProcessor(serverStream, streamDesc, serializer, pool, opt)
 	} else {

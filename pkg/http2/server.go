@@ -72,6 +72,10 @@ func NewServer(address string, conf tConfig.ServerConfig) *Server {
 		conf.Logger = default_logger.GetDefaultLogger()
 	}
 
+	if conf.HandlerGRManagedByUser {
+		conf.Logger.Debug("use http2 handleGRMangedByUser mod, pls ensure your http2 handler could start new gr.")
+	}
+
 	return &Server{
 		frameHandler:         headerHandler,
 		address:              address,
@@ -286,7 +290,6 @@ func (s *Server) http2HandleFunction(wi http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.handleGRMangedByUser {
-		s.logger.Debug("use http2 handleGRMangedByUser mod, pls ensure your http2 handler could start new gr.")
 		handler(path, headerField, bodyCh, sendChan, ctrlChan, errChan)
 	} else {
 		go func() {

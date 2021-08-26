@@ -52,12 +52,13 @@ type processor interface {
 
 // baseProcessor is the basic impl of processor, which contains four base fields, such as rpc status handle function
 type baseProcessor struct {
-	stream      *serverStream
-	twoWayCodec common.TwoWayCodec
-	done        chan struct{}
-	quitOnce    sync.Once
-	pool        gxsync.WorkerPool
-	opt         *config.Option
+	stream       *serverStream
+	twoWayCodec  common.TwoWayCodec
+	genericCodec common.GenericCodec
+	done         chan struct{}
+	quitOnce     sync.Once
+	pool         gxsync.WorkerPool
+	opt          *config.Option
 }
 
 // handleRPCErr writes close message with status of given @err
@@ -90,16 +91,17 @@ type unaryProcessor struct {
 }
 
 // newUnaryProcessor creates unary processor
-func newUnaryProcessor(s *serverStream, desc grpc.MethodDesc, serializer common.TwoWayCodec,
+func newUnaryProcessor(s *serverStream, desc grpc.MethodDesc, serializer common.TwoWayCodec, genericCodec common.GenericCodec,
 	pool gxsync.WorkerPool, option *config.Option) (processor, error) {
 	return &unaryProcessor{
 		baseProcessor: baseProcessor{
-			twoWayCodec: serializer,
-			stream:      s,
-			done:        make(chan struct{}, 1),
-			quitOnce:    sync.Once{},
-			pool:        pool,
-			opt:         option,
+			twoWayCodec:  serializer,
+			genericCodec: genericCodec,
+			stream:       s,
+			done:         make(chan struct{}, 1),
+			quitOnce:     sync.Once{},
+			pool:         pool,
+			opt:          option,
 		},
 		methodDesc: desc,
 	}, nil
@@ -130,21 +132,31 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 		if !ok {
 			return nil, status.Errorf(codes.Internal, "msgpack provider service doesn't impl TripleUnaryService")
 		}
-		reqParam, ok := unaryService.GetReqParamsInterfaces(methodName)
-		if !ok {
-			return nil, status.Errorf(codes.Internal, "provider unmarshal error: no req param data")
+
+		if methodName == "$invoke" {
+			var args []interface{}
+			args, err = p.genericCodec.UnmarshalRequest(readBuf)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, err.Error())
+			}
+			reply, err = unaryService.InvokeWithArgs(header.FieldToCtx(), methodName, args)
+		} else {
+			reqParam, ok := unaryService.GetReqParamsInterfaces(methodName)
+			if !ok {
+				return nil, status.Errorf(codes.Internal, "provider unmarshal error: no req param data")
+			}
+			// get args from buf
+			if err = p.twoWayCodec.UnmarshalRequest(readBuf, reqParam); err != nil {
+				return nil, status.Errorf(codes.Internal, "Unary rpc request unmarshal error: %s", err)
+			}
+			args := make([]interface{}, 0, len(reqParam))
+			for _, v := range reqParam {
+				tempParamObj := reflect.ValueOf(v).Elem().Interface()
+				args = append(args, tempParamObj)
+			}
+			// invoke the service
+			reply, err = unaryService.InvokeWithArgs(header.FieldToCtx(), methodName, args)
 		}
-		// get args from buf
-		if err = p.twoWayCodec.UnmarshalRequest(readBuf, reqParam); err != nil {
-			return nil, status.Errorf(codes.Internal, "Unary rpc request unmarshal error: %s", err)
-		}
-		args := make([]interface{}, 0, len(reqParam))
-		for _, v := range reqParam {
-			tempParamObj := reflect.ValueOf(v).Elem().Interface()
-			args = append(args, tempParamObj)
-		}
-		// invoke the service
-		reply, err = unaryService.InvokeWithArgs(header.FieldToCtx(), methodName, args)
 	}
 
 	if err != nil {

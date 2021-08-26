@@ -63,7 +63,6 @@ func (t *TripleServer) Start() {
 		PathExtractor:          path.NewDefaultExtractor(),
 		HandlerGRManagedByUser: true,
 	})
-
 	tripleCtl, err := http2.NewTripleController(t.opt)
 	if err != nil {
 		t.opt.Logger.Error("new http2 controller failed with error = %v", err)
@@ -76,4 +75,17 @@ func (t *TripleServer) Start() {
 	})
 
 	t.http2Server.Start()
+}
+
+func (t *TripleServer) RefreshService() {
+	tripleCtl, err := http2.NewTripleController(t.opt)
+	if err != nil {
+		t.opt.Logger.Error("new http2 controller failed with error = %v", err)
+		return
+	}
+
+	t.rpcServiceMap.Range(func(key, value interface{}) bool {
+		t.http2Server.RegisterHandler(key.(string), tripleCtl.GetHandler(value))
+		return true
+	})
 }
