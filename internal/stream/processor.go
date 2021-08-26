@@ -134,7 +134,8 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 		}
 
 		if methodName == "$invoke" {
-			args, err := p.genericCodec.UnmarshalRequest(readBuf)
+			var args []interface{}
+			args, err = p.genericCodec.UnmarshalRequest(readBuf)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, err.Error())
 			}
