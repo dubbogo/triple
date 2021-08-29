@@ -284,7 +284,7 @@ func (s *Server) http2HandleFunction(wi http.ResponseWriter, r *http.Request) {
 	if handler == nil {
 		//todo add error handler interface, let user define their handler
 		err := perrors.Errorf("no handler was found for path: %s", path)
-		s.logger.Warn(err)
+		s.logger.Warn("[HTTP2 ERROR] no handler was found for path: %s", path)
 		writeResponse(w, s.logger, 400, err.Error())
 		return
 	}

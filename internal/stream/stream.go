@@ -175,13 +175,7 @@ func NewServerStreamForNonPB(ctx context.Context, header h2Triple.ProtocolHeader
 		baseStream: *baseStream,
 		header:     header,
 	}
-	var err error
-	serverStream.processor, err = newUnaryProcessor(serverStream, grpc.MethodDesc{}, serializer, genericCodec, pool, opt)
-	if err != nil {
-		opt.Logger.Errorf("new processor error with err = %s\n", err)
-		return nil, err
-	}
-
+	serverStream.processor = newUnaryProcessor(serverStream, grpc.MethodDesc{}, serializer, genericCodec, pool, opt)
 	return serverStream, serverStream.processor.runRPC(ctx)
 }
 
@@ -196,21 +190,15 @@ func NewServerStreamForPB(ctx context.Context, header h2Triple.ProtocolHeader, d
 	}
 
 	// get processor for serverStream based on the type of the desc
-	var err error
 	if methodDesc, ok := desc.(grpc.MethodDesc); ok {
 		// pkgHandler and processor are the same level
-		serverStream.processor, err = newUnaryProcessor(serverStream, methodDesc, serializer, nil, pool, opt)
+		serverStream.processor = newUnaryProcessor(serverStream, methodDesc, serializer, nil, pool, opt)
 	} else if streamDesc, ok := desc.(grpc.StreamDesc); ok {
-		serverStream.processor, err = newStreamingProcessor(serverStream, streamDesc, serializer, pool, opt)
+		serverStream.processor = newStreamingProcessor(serverStream, streamDesc, serializer, pool, opt)
 	} else {
 		opt.Logger.Error("grpc desc invalid:", desc)
 		return nil, perrors.Errorf("grpc desc invalid: %v", desc)
 	}
-	if err != nil {
-		opt.Logger.Errorf("new processor error with err = %s\n", err)
-		return nil, err
-	}
-
 	return serverStream, serverStream.processor.runRPC(ctx)
 }
 

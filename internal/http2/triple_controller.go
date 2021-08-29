@@ -272,7 +272,7 @@ func (hc *TripleController) newServerStreamFromTripleHeader(ctx context.Context,
 		return nil, err
 	}
 
-	var newstm stream.Stream
+	var newStream stream.Stream
 	triHeader := codec.NewTripleHeader(path, header)
 
 	// creat server stream
@@ -291,39 +291,40 @@ func (hc *TripleController) newServerStreamFromTripleHeader(ctx context.Context,
 		streamRPCDiscovery, streamOk := streamMap[methodName]
 
 		if unaryOk {
-			newstm, err = stream.NewServerStreamForPB(ctx, triHeader, unaryRPCDiscovery, hc.option,
+			newStream, err = stream.NewServerStreamForPB(ctx, triHeader, unaryRPCDiscovery, hc.option,
 				pool, service, hc.twoWayCodec)
 			if err != nil {
 				hc.option.Logger.Errorf("newServerStream error", err)
 				return nil, err
 			}
 		} else if streamOk {
-			newstm, err = stream.NewServerStreamForPB(ctx, triHeader, streamRPCDiscovery, hc.option,
+			newStream, err = stream.NewServerStreamForPB(ctx, triHeader, streamRPCDiscovery, hc.option,
 				pool, service, hc.twoWayCodec)
 			if err != nil {
-				hc.option.Logger.Error("newServerStream error", err)
+				hc.option.Logger.Errorf("newServerStream error = %s", err)
 				return nil, err
 			}
 		} else {
 			hc.option.Logger.Errorf("method name %s not found in desc\n", methodName)
-			return nil, status.Err(codes.Unimplemented, "method name %s not found in desc")
+			return nil, status.Errorf(codes.Unimplemented, "method name %s not found in desc", methodName)
 		}
 
 	} else {
 		service, ok := rpcService.(common.TripleUnaryService)
 		if !ok {
-			return nil, status.Err(codes.Internal, "can't assert impl of interface "+interfaceKey+" to TripleUnaryService")
+			hc.option.Logger.Errorf("can't assert impl of interface %s service %+v to TripleUnaryService", interfaceKey, rpcService)
+			return nil, status.Errorf(codes.Internal, "can't assert impl of interface %s service %+v to TripleUnaryService", interfaceKey, rpcService)
 		}
-		// hessian twoWayCodec doesn't need to use grpc.Desc, and now only support unary invocation
+		// unary service doesn't need to use grpc.Desc, and now only support unary invocation
 		var err error
-		newstm, err = stream.NewServerStreamForNonPB(ctx, triHeader, hc.option, pool, service, hc.twoWayCodec, hc.genericCodec)
+		newStream, err = stream.NewServerStreamForNonPB(ctx, triHeader, hc.option, pool, service, hc.twoWayCodec, hc.genericCodec)
 		if err != nil {
-			hc.option.Logger.Errorf("hessian server new server stream error = %v", err)
+			hc.option.Logger.Errorf("unary service new server stream error = %v", err)
 			return nil, err
 		}
 	}
 
-	return newstm, nil
+	return newStream, nil
 
 }
 
