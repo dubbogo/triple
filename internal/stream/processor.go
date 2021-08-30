@@ -129,7 +129,7 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 			}
 			return nil
 		}
-		p.opt.Logger.Debugf("unary invoke pb service method %s with header %+v",methodName, header )
+		p.opt.Logger.Debugf("unary invoke pb service method %s with header %+v", methodName, header)
 		reply, err = p.methodDesc.Handler(service, header.FieldToCtx(), descFunc, nil)
 	} else {
 		unaryService, ok := service.(common.TripleUnaryService)
@@ -145,7 +145,7 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 				p.opt.Logger.Errorf("generic invoke with request %s unmarshal error = %s", string(readBuf), err.Error())
 				return nil, status.Errorf(codes.Internal, "generic invoke with request %s unmarshal error = %s", string(readBuf), err.Error())
 			}
-			p.opt.Logger.Debugf("generic invoke service with header %+v and args %+v", header,args )
+			p.opt.Logger.Debugf("generic invoke service with header %+v and args %+v", header, args)
 			reply, err = unaryService.InvokeWithArgs(header.FieldToCtx(), methodName, args)
 		} else {
 			reqParam, ok := unaryService.GetReqParamsInterfaces(methodName)
@@ -164,7 +164,7 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 				args = append(args, tempParamObj)
 			}
 			// invoke the service
-			p.opt.Logger.Debugf("unary invoke service method %s with header %+v and args %+v",methodName, header,args )
+			p.opt.Logger.Debugf("unary invoke service method %s with header %+v and args %+v", methodName, header, args)
 			reply, err = unaryService.InvokeWithArgs(header.FieldToCtx(), methodName, args)
 		}
 	}
@@ -199,8 +199,8 @@ func (p *unaryProcessor) runRPC(ctx context.Context) error {
 			// in this case, server unary processor have the chance to do process and return result
 			defer func() {
 				if e := recover(); e != nil {
-					p.opt.Logger.Errorf("when running unary process, cache error = %v",e)
-					p.handleRPCErr(errors.New(fmt.Sprintf("%v",e)))
+					p.opt.Logger.Errorf("when running unary process, cache error = %v", e)
+					p.handleRPCErr(errors.New(fmt.Sprintf("%v", e)))
 				}
 			}()
 			if recvMsg.Err != nil {
@@ -210,7 +210,7 @@ func (p *unaryProcessor) runRPC(ctx context.Context) error {
 			}
 			rspData, err := p.processUnaryRPC(*recvMsg.Buffer, p.stream.getService(), p.stream.getHeader())
 			if err != nil {
-				p.opt.Logger.Errorf("process unary rpc with header = %+v, data = %s,  error = %s",p.stream.getHeader(), recvMsg.Buffer.String(), err)
+				p.opt.Logger.Errorf("process unary rpc with header = %+v, data = %s,  error = %s", p.stream.getHeader(), recvMsg.Buffer.String(), err)
 				p.handleRPCErr(err)
 				return
 			}
