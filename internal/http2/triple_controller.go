@@ -294,14 +294,14 @@ func (hc *TripleController) newServerStreamFromTripleHeader(ctx context.Context,
 			newStream, err = stream.NewServerStreamForPB(ctx, triHeader, unaryRPCDiscovery, hc.option,
 				pool, service, hc.twoWayCodec)
 			if err != nil {
-				hc.option.Logger.Errorf("newServerStream error", err)
+				hc.option.Logger.Errorf("newServerStream error = %v", err)
 				return nil, err
 			}
 		} else if streamOk {
 			newStream, err = stream.NewServerStreamForPB(ctx, triHeader, streamRPCDiscovery, hc.option,
 				pool, service, hc.twoWayCodec)
 			if err != nil {
-				hc.option.Logger.Errorf("newServerStream error = %s", err)
+				hc.option.Logger.Errorf("newServerStream error = %v", err)
 				return nil, err
 			}
 		} else {

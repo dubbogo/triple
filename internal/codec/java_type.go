@@ -97,7 +97,7 @@ func GetArgType(v interface{}) string {
 	default:
 		t := reflect.TypeOf(v)
 		if reflect.Ptr == t.Kind() {
-			t = reflect.TypeOf(reflect.ValueOf(v).Elem())
+			t = t.Elem()
 		}
 		switch t.Kind() {
 		case reflect.Struct:
