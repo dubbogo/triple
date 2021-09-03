@@ -69,7 +69,7 @@ func NewTripleHeader(path string, header http.Header) h2Triple.ProtocolHeader {
 			tripleHeader.RPCID = v[0]
 		case textproto.CanonicalMIMEHeaderKey(constant.TripleTraceID):
 			tripleHeader.TracingID = v[0]
-		case textproto.CanonicalMIMEHeaderKey(constant.TripleTraceID):
+		case textproto.CanonicalMIMEHeaderKey(constant.TripleTraceRPCID):
 			tripleHeader.TracingRPCID = v[0]
 		case textproto.CanonicalMIMEHeaderKey(constant.TripleTraceProtoBin):
 			tripleHeader.TracingContext = v[0]
@@ -78,7 +78,7 @@ func NewTripleHeader(path string, header http.Header) h2Triple.ProtocolHeader {
 		case textproto.CanonicalMIMEHeaderKey("content-type"):
 			tripleHeader.ContentType = v[0]
 		case textproto.CanonicalMIMEHeaderKey("authorization"):
-			tripleHeader.ContentType = v[0]
+			tripleHeader.Authorization = v
 		case textproto.CanonicalMIMEHeaderKey(constant.TripleAttachement):
 			tripleHeader.Attachment = v[0]
 		// todo: usage of these part of fields needs to be discussed later
@@ -188,7 +188,7 @@ func (t *TripleHeaderHandler) ReadFromTripleReqHeader(r *http.Request) h2Triple.
 			tripleHeader.RPCID = v[0]
 		case textproto.CanonicalMIMEHeaderKey(constant.TripleTraceID):
 			tripleHeader.TracingID = v[0]
-		case textproto.CanonicalMIMEHeaderKey(constant.TripleTraceID):
+		case textproto.CanonicalMIMEHeaderKey(constant.TripleTraceRPCID):
 			tripleHeader.TracingRPCID = v[0]
 		case textproto.CanonicalMIMEHeaderKey(constant.TripleTraceProtoBin):
 			tripleHeader.TracingContext = v[0]
@@ -197,7 +197,7 @@ func (t *TripleHeaderHandler) ReadFromTripleReqHeader(r *http.Request) h2Triple.
 		case textproto.CanonicalMIMEHeaderKey("content-type"):
 			tripleHeader.ContentType = v[0]
 		case textproto.CanonicalMIMEHeaderKey("authorization"):
-			tripleHeader.ContentType = v[0]
+			tripleHeader.Authorization = v
 		// todo: usage of these part of fields needs to be discussed later
 		//case "grpc-encoding":
 		//case "grpc-status":
