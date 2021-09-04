@@ -19,12 +19,15 @@ package triple
 
 import (
 	"context"
-	"github.com/dubbogo/triple/pkg/common"
 	"reflect"
 )
 
 import (
 	"google.golang.org/grpc"
+)
+
+import (
+	"github.com/dubbogo/triple/pkg/common"
 )
 
 // TripleConn is the struct that called in pb.go file

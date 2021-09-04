@@ -19,11 +19,11 @@ package message
 
 import (
 	"bytes"
-	"github.com/dubbogo/triple/pkg/common"
 )
 
 import (
 	"github.com/dubbogo/triple/internal/status"
+	"github.com/dubbogo/triple/pkg/common"
 )
 
 ////////////////////////////////Buffer and MsgType

@@ -22,7 +22,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/golang/protobuf/proto"
 	"net/http"
 	"runtime"
 	"strconv"
@@ -31,6 +30,8 @@ import (
 
 import (
 	gxsync "github.com/dubbogo/gost/sync"
+
+	"github.com/golang/protobuf/proto"
 
 	perrors "github.com/pkg/errors"
 
