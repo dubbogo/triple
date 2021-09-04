@@ -58,7 +58,6 @@ endif
 OUT_DIR := $(BASE_DIR)/$(GOOS)_$(GOARCH)/$(BUILD_TYPE)
 LOG_FILE := $(OUT_DIR)/$(PROJECT_NAME).log
 
-export APP_LOG_CONF_FILE ?= $(OUT_DIR)/conf/log.yml
 
 .PHONY: all
 all: help
@@ -84,12 +83,7 @@ $(OUT_DIR)/$(PROJECT_NAME)$(EXT_NAME):
 config:
 	$(info   >  Setting up config files)
 	@mkdir -p $(OUT_DIR)/conf
-	@-test -f $(PROJECT_DIR)/conf/log.yml && cat $(PROJECT_DIR)/conf/log.yml | sed "s#\$$HOST_IP#$(DOCKER_HOST_IP)#g" > $(OUT_DIR)/conf/log.yml && echo "  > $(OUT_DIR)/conf/log.yml"
-	@-test -f $(PROJECT_DIR)/conf/server.yml && cat $(PROJECT_DIR)/conf/server.yml | sed "s#\$$HOST_IP#$(DOCKER_HOST_IP)#g" > $(OUT_DIR)/conf/server.yml && echo "  > $(OUT_DIR)/conf/server.yml"
-	@-test -f $(PROJECT_DIR)/conf/client.yml && cat $(PROJECT_DIR)/conf/client.yml | sed "s#\$$HOST_IP#$(DOCKER_HOST_IP)#g" > $(OUT_DIR)/conf/client.yml && echo "  > $(OUT_DIR)/conf/client.yml"
-	@-test -f $(PROJECT_DIR)/conf/router_config.yml && cat $(PROJECT_DIR)/conf/router_config.yml | sed "s#\$$HOST_IP#$(DOCKER_HOST_IP)#g" > $(OUT_DIR)/conf/router_config.yml && echo "  > $(OUT_DIR)/conf/router_config.yml"
-	@-test -f $(PROJECT_DIR)/conf/virtual_service.yml && cat $(PROJECT_DIR)/conf/virtual_service.yml | sed "s#\$$HOST_IP#$(DOCKER_HOST_IP)#g" > $(OUT_DIR)/conf/virtual_service.yml && echo "  > $(OUT_DIR)/conf/virtual_service.yml"
-	@-test -f $(PROJECT_DIR)/conf/dest_rule.yml && cat $(PROJECT_DIR)/conf/dest_rule.yml | sed "s#\$$HOST_IP#$(DOCKER_HOST_IP)#g" > $(OUT_DIR)/conf/dest_rule.yml && echo "  > $(OUT_DIR)/conf/dest_rule.yml"
+	@-test -f $(PROJECT_DIR)/conf/dubbogo.yml && cat $(PROJECT_DIR)/conf/dubbogo.yml | sed "s#\$$HOST_IP#$(DOCKER_HOST_IP)#g" > $(OUT_DIR)/conf/dubbogo.yml && echo "  > $(OUT_DIR)/conf/dubbogo.yml"
 
 ## docker-health-check: check services health on docker
 .PHONY: docker-health-check
@@ -117,7 +111,7 @@ clean: stop
 
 ## start: Start the application (for server)
 .PHONY: start
-start: export CONF_PROVIDER_FILE_PATH ?= $(OUT_DIR)/conf/server.yml
+start: export DUBBO_GO_CONFIG_PATH ?= $(OUT_DIR)/conf/dubbogo.yml
 start: build
 	$(info   >  Starting application $(PROJECT_NAME), output is redirected to $(LOG_FILE))
 	@-$(OUT_DIR)/$(PROJECT_NAME)$(EXT_NAME) > $(LOG_FILE) 2>&1 & echo $$! > $(PID)
@@ -143,10 +137,7 @@ start-java: $(info   >  Starting java application $(PROJECT_NAME), output is red
 
 ## run: Run the application (for client)
 .PHONY: run
-run: export CONF_CONSUMER_FILE_PATH ?= $(OUT_DIR)/conf/client.yml
-run: export CONF_ROUTER_FILE_PATH ?= $(OUT_DIR)/conf/router_config.yml
-run: export CONF_DEST_RULE_FILE_PATH ?= $(OUT_DIR)/conf/dest_rule.yml
-run: export CONF_VIRTUAL_SERVICE_FILE_PATH ?= $(OUT_DIR)/conf/virtual_service.yml
+run: export DUBBO_GO_CONFIG_PATH ?= $(OUT_DIR)/conf/dubbogo.yml
 run: build
 	$(info   >  Running application $(PROJECT_NAME), output is redirected to $(LOG_FILE))
 	@-$(OUT_DIR)/$(PROJECT_NAME)$(EXT_NAME) 2>&1 | tee $(LOG_FILE)
@@ -168,10 +159,7 @@ clean-java: clean
 
 ## integration: Run integration test for this application
 .PHONY: integration
-integration: export CONF_CONSUMER_FILE_PATH ?= $(OUT_DIR)/conf/client.yml
-integration: export CONF_ROUTER_FILE_PATH ?= $(OUT_DIR)/conf/router_config.yml
-integration: export CONF_DEST_RULE_FILE_PATH ?= $(OUT_DIR)/conf/dest_rule.yml
-integration: export CONF_VIRTUAL_SERVICE_FILE_PATH ?= $(OUT_DIR)/conf/virtual_service.yml
+integration: export DUBBO_GO_CONFIG_PATH ?= $(OUT_DIR)/conf/dubbogo.yml
 integration:
 	$(info   >  Running integration test for application $(PROJECT_NAME))
 	@go clean -testcache

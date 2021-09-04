@@ -4,7 +4,7 @@ option java_multiple_files = true;
 option java_package = "org.apache.dubbo";
 option java_outer_classname = "HelloWorldProto";
 option objc_class_prefix = "DEMOSRV";
-option go_package = "./;pkg";
+option go_package = "./;proto";
 
 package main;
 
