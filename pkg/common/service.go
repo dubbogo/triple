@@ -35,3 +35,38 @@ type TripleUnaryService interface {
 	InvokeWithArgs(ctx context.Context, methodName string, arguments []interface{}) (interface{}, error)
 	GetReqParamsInterfaces(methodName string) ([]interface{}, bool)
 }
+
+type TripleAttachment map[string]string
+type DubboAttachment map[string]interface{}
+
+// OuterResult is a dubbo RPC result
+type OuterResult interface {
+	// Result gets invoker result.
+	Result() interface{}
+	// Attachments gets all attachments
+	Attachments() map[string]interface{}
+}
+
+type ErrorWithAttachment struct {
+	err         error
+	attachments TripleAttachment
+}
+
+func NewErrorWithAttachment(err error, attachments TripleAttachment) *ErrorWithAttachment {
+	return &ErrorWithAttachment{
+		err:         err,
+		attachments: attachments,
+	}
+}
+
+func (e *ErrorWithAttachment) GetAttachments() TripleAttachment {
+	return e.attachments
+}
+
+func (e *ErrorWithAttachment) GetError() error {
+	return e.err
+}
+
+func (e *ErrorWithAttachment) Error() string {
+	return e.err.Error()
+}

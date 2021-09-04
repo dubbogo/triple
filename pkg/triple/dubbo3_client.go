@@ -76,12 +76,20 @@ func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error
 }
 
 // Invoke call remote using stub
-func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply interface{}) error {
+func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply interface{}) common.ErrorWithAttachment {
+	attachment := make(common.TripleAttachment)
 	if t.opt.CodecType == constant.PBCodecName {
 		method := t.stubInvoker.MethodByName(methodName)
 		res := method.Call(in)
-		if res[1].IsValid() && res[1].Interface() != nil {
-			return res[1].Interface().(error)
+		errWithAtta, ok := res[1].Interface().(common.ErrorWithAttachment)
+		if ok {
+			if errWithAtta.GetError() != nil {
+				return *common.NewErrorWithAttachment(errWithAtta.GetError(), attachment)
+			}
+			attachment = errWithAtta.GetAttachments()
+		} else if res[1].IsValid() && res[1].Interface() != nil {
+			// compatible with not updated triple stub
+			return *common.NewErrorWithAttachment(res[1].Interface().(error), attachment)
 		}
 		_ = tools.ReflectResponse(res[0], reply)
 	} else {
@@ -93,18 +101,15 @@ func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply inter
 				reqParams = append(reqParams, v.Interface())
 			}
 		}
-		err := t.Request(ctx, "/"+interfaceKey+"/"+methodName, reqParams, reply)
-		if err != nil {
-			return err
-		}
+		return t.Request(ctx, "/"+interfaceKey+"/"+methodName, reqParams, reply)
 	}
-	return nil
+	return *common.NewErrorWithAttachment(nil, attachment)
 }
 
 // Request call h2Controller to send unary rpc req to server
 // @path is /interfaceKey/functionName e.g. /com.apache.dubbo.sample.basic.IGreeter/BigUnaryTest
 // @arg is request body
-func (t *TripleClient) Request(ctx context.Context, path string, arg, reply interface{}) error {
+func (t *TripleClient) Request(ctx context.Context, path string, arg, reply interface{}) common.ErrorWithAttachment {
 	return t.h2Controller.UnaryInvoke(ctx, path, arg, reply)
 }
 

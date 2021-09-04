@@ -74,7 +74,7 @@ func TestBaseUserStream(t *testing.T) {
 	// put msg
 	for i := 0; i < 500; i++ {
 		baseUserStream.PutRecv(testData, message.ServerStreamCloseMsgType)
-		baseUserStream.PutSend(testData, message.DataMsgType)
+		baseUserStream.PutSend(testData, make(map[string]string), message.DataMsgType)
 	}
 	time.Sleep(time.Second)
 	assert.Equal(t, counter, 1000)

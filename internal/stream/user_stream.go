@@ -68,7 +68,7 @@ func (ss *baseUserStream) SendMsg(m interface{}) error {
 		ss.opt.Logger.Error("send msg error with msg = ", m)
 		return err
 	}
-	ss.stream.PutSend(replyData, message.DataMsgType)
+	ss.stream.PutSend(replyData, nil, message.DataMsgType)
 	return nil
 }
 

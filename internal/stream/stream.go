@@ -45,7 +45,7 @@ import (
 type Stream interface {
 	// channel usage
 	PutRecv(data []byte, msgType message.MsgType)
-	PutSend(data []byte, msgType message.MsgType)
+	PutSend(data []byte, attachment map[string]string, msgType message.MsgType)
 	GetSend() <-chan message.Message
 	GetRecv() <-chan message.Message
 	PutSplitDataRecv(splitData []byte, msgType message.MsgType, handler common.PackageHandler)
@@ -118,10 +118,11 @@ func (s *baseStream) PutSplitDataRecv(splitData []byte, msgType message.MsgType,
 }
 
 // PutSend put message type and @data to sendBuf
-func (s *baseStream) PutSend(data []byte, msgType message.MsgType) {
+func (s *baseStream) PutSend(data []byte, attachment map[string]string, msgType message.MsgType) {
 	s.sendBuf.Put(message.Message{
-		Buffer:  bytes.NewBuffer(data),
-		MsgType: msgType,
+		Buffer:     bytes.NewBuffer(data),
+		MsgType:    msgType,
+		Attachment: attachment,
 	})
 }
 
