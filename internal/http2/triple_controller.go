@@ -22,6 +22,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/golang/protobuf/proto"
 	"net/http"
 	"runtime"
 	"strconv"
@@ -30,8 +31,6 @@ import (
 
 import (
 	gxsync "github.com/dubbogo/gost/sync"
-
-	"github.com/golang/protobuf/proto"
 
 	perrors "github.com/pkg/errors"
 
@@ -97,15 +96,12 @@ func (hc *TripleController) GetHandler(rpcService interface{}) http2.Handler {
 
 		if err := hc.pool.Submit(func() {
 			var (
-				tripleStatus *status.Status
+				tripleStatus  *status.Status
+				rspAttachment = make(common.TripleAttachment)
 			)
 
 			rspHeader := make(map[string][]string)
 			rspHeader["content-type"] = []string{constant.TripleContentType}
-			rspHeader[constant.TrailerKeyGrpcStatus] = []string{constant.TrailerKey}
-			rspHeader[constant.TrailerKeyGrpcMessage] = []string{constant.TrailerKey}
-			rspHeader[constant.TrailerKeyTraceProtoBin] = []string{constant.TrailerKey}
-			rspHeader[constant.TrailerKeyGrpcDetailsBin] = []string{constant.TrailerKey}
 			ctrlch <- rspHeader
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -116,7 +112,7 @@ func (hc *TripleController) GetHandler(rpcService interface{}) http2.Handler {
 				hc.option.Logger.Errorf("creat server stream error = %v\n", err)
 				tripleStatus, _ = status.FromError(err)
 				close(sendChan)
-				hc.handleStatusAndResponse(tripleStatus, ctrlch)
+				hc.handleStatusAttachmentAndResponse(tripleStatus, nil, ctrlch)
 				return
 			}
 
@@ -142,7 +138,7 @@ func (hc *TripleController) GetHandler(rpcService interface{}) http2.Handler {
 			if err := hc.pool.Submit(sendToStream); err != nil {
 				close(sendChan)
 				hc.option.Logger.Warnf("go routine pool full with error = %v", err)
-				hc.handleStatusAndResponse(status.New(codes.ResourceExhausted, fmt.Sprintf("go routine pool full with error = %v", err)), ctrlch)
+				hc.handleStatusAttachmentAndResponse(status.New(codes.ResourceExhausted, fmt.Sprintf("go routine pool full with error = %v", err)), nil, ctrlch)
 				return
 			}
 
@@ -160,12 +156,13 @@ func (hc *TripleController) GetHandler(rpcService interface{}) http2.Handler {
 						}
 						break Loop
 					}
+					rspAttachment = sendMsg.Attachment
 					sendChan <- sendMsg.Buffer
 				}
 			}
 			close(sendChan)
 
-			hc.handleStatusAndResponse(tripleStatus, ctrlch)
+			hc.handleStatusAttachmentAndResponse(tripleStatus, rspAttachment, ctrlch)
 			// close all related go routines
 			close(closeSendChan)
 
@@ -174,24 +171,25 @@ func (hc *TripleController) GetHandler(rpcService interface{}) http2.Handler {
 			go func() {
 				rspHeader := make(map[string][]string)
 				rspHeader["content-type"] = []string{constant.TripleContentType}
-				rspHeader[constant.TrailerKeyGrpcStatus] = []string{constant.TrailerKey}
-				rspHeader[constant.TrailerKeyGrpcMessage] = []string{constant.TrailerKey}
-				rspHeader[constant.TrailerKeyTraceProtoBin] = []string{constant.TrailerKey}
-				rspHeader[constant.TrailerKeyGrpcDetailsBin] = []string{constant.TrailerKey}
 				ctrlch <- rspHeader
 				close(sendChan)
 				hc.option.Logger.Warnf("go routine pool full with error = %v", err)
-				hc.handleStatusAndResponse(status.New(codes.ResourceExhausted, fmt.Sprintf("go routine pool full with error = %v", err)), ctrlch)
+				hc.handleStatusAttachmentAndResponse(status.New(codes.ResourceExhausted, fmt.Sprintf("go routine pool full with error = %v", err)), nil, ctrlch)
 			}()
 		}
 	}
 }
 
-func (hc *TripleController) handleStatusAndResponse(tripleStatus *status.Status, ctrlch chan http.Header) {
+func (hc *TripleController) handleStatusAttachmentAndResponse(tripleStatus *status.Status, attachment map[string]string, ctrlch chan http.Header) {
 	// second response header with trailer fields
 	rspTrialer := make(map[string][]string)
 	rspTrialer[constant.TrailerKeyGrpcStatus] = []string{strconv.Itoa(int(tripleStatus.Code()))} //[]string{strconv.Itoa(int(tripleStatus.Code()))}
 	rspTrialer[constant.TrailerKeyGrpcMessage] = []string{tripleStatus.Message()}
+	if attachment != nil {
+		for k, v := range attachment {
+			rspTrialer[k] = []string{v}
+		}
+	}
 	statusProto := tripleStatus.Proto()
 	if statusProto != nil {
 		if stBytes, err := proto.Marshal(statusProto); err != nil {
@@ -389,11 +387,15 @@ func (hc *TripleController) StreamInvoke(ctx context.Context, path string) (grpc
 }
 
 // UnaryInvoke can start unary invocation, called by dubbo3 client, with @path and request @data
-func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, reply interface{}) error {
+func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, reply interface{}) (common.TripleAttachment, error) {
+	var code int
+	var msg string
+	var attachment = make(common.TripleAttachment)
+
 	sendData, err := hc.twoWayCodec.MarshalRequest(arg)
 	if err != nil {
 		hc.option.Logger.Errorf("client request marshal error = %v", err)
-		return err
+		return attachment, err
 	}
 
 	headerHandler, _ := common.GetProtocolHeaderHandler(hc.option, ctx)
@@ -408,27 +410,38 @@ func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, r
 	})
 	if err != nil {
 		hc.option.Logger.Error("triple unary invoke path" + path + " with addr = " + hc.address + " error = " + err.Error())
-		return err
+		return attachment, err
 	}
 
-	code, err := strconv.Atoi(rspTrailerHeader.Get(constant.TrailerKeyGrpcStatus))
-	if err != nil {
-		hc.option.Logger.Errorf("get trailer err = %v", err)
-		return perrors.Errorf("get trailer err = %v", err)
+	for k, v := range rspTrailerHeader {
+		if len(v) == 0 {
+			continue
+		}
+		switch k {
+		case constant.TrailerKeyGrpcStatus:
+			code, err = strconv.Atoi(v[0])
+			if err != nil {
+				hc.option.Logger.Errorf("get trailer err = %v", err)
+				return attachment, perrors.Errorf("get trailer err = %v", err)
+			}
+		case constant.TrailerKeyGrpcMessage:
+			msg = rspTrailerHeader.Get(v[0])
+		default:
+			attachment[k] = v[0]
+		}
 	}
-	msg := rspTrailerHeader.Get(constant.TrailerKeyGrpcMessage)
 
 	if codes.Code(code) != codes.OK {
 		hc.option.Logger.Errorf("grpc status not success, msg = %s, code = %d", msg, code)
-		return perrors.Errorf("grpc status not success, msg = %s, code = %d", msg, code)
+		return attachment, perrors.Errorf("grpc status not success, msg = %s, code = %d", msg, code)
 	}
 
 	// all split data are collected and to unmarshal
 	if err := hc.twoWayCodec.UnmarshalResponse(rspData, reply); err != nil {
 		hc.option.Logger.Errorf("client unmarshal rsp err= %v\n", err)
-		return err
+		return attachment, err
 	}
-	return nil
+	return attachment, nil
 }
 
 // Destroy destroys TripleController and force close all related goroutine

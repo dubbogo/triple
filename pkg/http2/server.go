@@ -300,16 +300,10 @@ func (s *Server) http2HandleFunction(wi http.ResponseWriter, r *http.Request) {
 	// first response
 	firstRspHeaderMap := <-ctrlChan
 	for k, v := range firstRspHeaderMap {
-		if len(v) > 0 && v[0] == constant.TrailerKey {
-			w.Header().Add(constant.TrailerKey, k)
-		} else {
-			for _, vi := range v {
-				w.Header().Add(k, vi)
-			}
+		for _, vi := range v {
+			w.Header().Add(k, vi)
 		}
 	}
-	w.Header().Add(constant.TrailerKey, constant.TrailerKeyHttp2Message)
-	w.Header().Add(constant.TrailerKey, constant.TrailerKeyHttp2Status)
 	w.WriteHeader(http.StatusOK)
 	w.FlushHeader()
 	success := true
@@ -343,16 +337,20 @@ Loop:
 		trailerMap[constant.TrailerKeyHttp2Status] = []string{"1"}
 		trailerMap[constant.TrailerKeyHttp2Message] = []string{errorMsg}
 	}
-	WriteTripleFinalRspHeaderField(w, trailerMap)
+	writeTripleFinalRspHeaderField(w, trailerMap)
 }
 
-// WriteTripleFinalRspHeaderField returns trailers header fields that triple and grpc defined
-func WriteTripleFinalRspHeaderField(w *http2.Http2ResponseWriter, trailer http.Header) {
+// writeTripleFinalRspHeaderField returns trailers header fields that triple and grpc defined
+func writeTripleFinalRspHeaderField(w *http2.Http2ResponseWriter, trailer http.Header) {
 	for k, v := range trailer {
-		if len(v) > 0 {
-			w.Header().Set(k, v[0])
-		}
+		w.Header().Add(http2.TrailerPrefix+k, v[0])
 	}
+	w.FlushTrailer()
+	//for k, v := range trailer {
+	//	if len(v) > 0 {
+	//		w.Header().Set(k, v[0])
+	//	}
+	//}
 }
 
 type defaultPathExtractor struct {

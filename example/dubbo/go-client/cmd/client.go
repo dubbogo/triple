@@ -78,8 +78,7 @@ func testSayHello() {
 	req := pkg.HelloRequest{
 		Name: "laurence",
 	}
-	user := pkg.User{}
-	err := greeterProvider.SayHello(ctx, &req, &user)
+	user, err := greeterProvider.SayHello(ctx, &req)
 	if err != nil {
 		panic(err)
 	}
@@ -96,7 +95,6 @@ func testSayHelloWithHighParallel() {
 	req := pkg.HelloRequest{
 		Name: "laurence",
 	}
-	user := pkg.User{}
 	for {
 		wg := sync.WaitGroup{}
 		goodCounter := atomic.Uint32{}
@@ -105,14 +103,14 @@ func testSayHelloWithHighParallel() {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := greeterProvider.SayHello(ctx, &req, &user)
+				usr, err := greeterProvider.SayHello(ctx, &req)
 				if err != nil {
 					badCounter.Inc()
 					logger.Error(err)
 					return
 				}
 				goodCounter.Inc()
-				logger.Infof("Receive user = %+v\n", user)
+				logger.Infof("Receive user = %+v\n", usr)
 			}()
 		}
 		wg.Wait()

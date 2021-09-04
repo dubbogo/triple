@@ -19,6 +19,7 @@ package message
 
 import (
 	"bytes"
+	"github.com/dubbogo/triple/pkg/common"
 )
 
 import (
@@ -28,10 +29,11 @@ import (
 ////////////////////////////////Buffer and MsgType
 // Message is the basic transfer unit in one stream
 type Message struct {
-	Buffer  *bytes.Buffer
-	MsgType MsgType
-	Status  *status.Status
-	Err     error // todo delete it, all change to status
+	Buffer     *bytes.Buffer
+	MsgType    MsgType
+	Status     *status.Status
+	Err        error // todo delete it, all change to status
+	Attachment common.TripleAttachment
 }
 
 func (bm *Message) Read(p []byte) (int, error) {

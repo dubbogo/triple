@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/textproto"
 	"strconv"
+	"strings"
 )
 
 import (
@@ -53,11 +54,13 @@ type TripleHeader struct {
 	GrpcStatus     string
 	GrpcMessage    string
 	Authorization  []string
-	Attachment     string
+	Attachment     common.TripleAttachment
 }
 
 func NewTripleHeader(path string, header http.Header) h2Triple.ProtocolHeader {
-	tripleHeader := &TripleHeader{}
+	tripleHeader := &TripleHeader{
+		Attachment: make(common.TripleAttachment),
+	}
 	tripleHeader.Path = path
 	for k, v := range header {
 		switch k {
@@ -79,13 +82,13 @@ func NewTripleHeader(path string, header http.Header) h2Triple.ProtocolHeader {
 			tripleHeader.ContentType = v[0]
 		case textproto.CanonicalMIMEHeaderKey("authorization"):
 			tripleHeader.Authorization = v
-		case textproto.CanonicalMIMEHeaderKey(constant.TripleAttachement):
-			tripleHeader.Attachment = v[0]
 		// todo: usage of these part of fields needs to be discussed later
 		//case "grpc-encoding":
 		//case "grpc-status":
 		//case "grpc-message":
 		default:
+			// attachment
+			tripleHeader.Attachment[strings.ToLower(k)] = v[0]
 		}
 	}
 	return tripleHeader
@@ -133,8 +136,17 @@ func (t *TripleHeaderHandler) WriteTripleReqHeaderField(header http.Header) http
 	// set triple user agent, to be capitabile with grpc
 	header["user-agent"] = []string{constant.TripleUserAgent}
 
+	// get attachment
+	outerAttachment, ok := t.Ctx.Value(string(constant.CtxAttachmentKey)).(common.DubboAttachment)
+	if ok {
+		for k, v := range outerAttachment {
+			if str, ok := v.(string); ok {
+				header[k] = []string{str}
+			}
+		}
+	}
+
 	// get from ctx
-	header[constant.TripleAttachement] = []string{getCtxVaSave(t.Ctx, string(constant.CtxAttachmentKey))}
 	header[constant.TripleRequestID] = []string{getCtxVaSave(t.Ctx, constant.TripleRequestID)}
 	header[constant.TripleTraceID] = []string{getCtxVaSave(t.Ctx, constant.TripleTraceID)}
 	header[constant.TripleTraceRPCID] = []string{getCtxVaSave(t.Ctx, constant.TripleTraceRPCID)}
@@ -153,6 +165,7 @@ func (t *TripleHeaderHandler) WriteTripleReqHeaderField(header http.Header) http
 	} else {
 		header["authorization"] = v
 	}
+
 	return header
 }
 
@@ -203,6 +216,8 @@ func (t *TripleHeaderHandler) ReadFromTripleReqHeader(r *http.Request) h2Triple.
 		//case "grpc-status":
 		//case "grpc-message":
 		default:
+			// attachment
+			tripleHeader.Attachment[strings.ToLower(k)] = v[0]
 		}
 	}
 	return tripleHeader
