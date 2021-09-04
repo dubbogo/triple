@@ -18,6 +18,8 @@
 package main
 
 import (
+	"context"
+	"dubbo.apache.org/dubbo-go/v3/common/logger"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
@@ -29,20 +31,13 @@ import (
 )
 
 import (
-	_ "dubbo.apache.org/dubbo-go/v3/cluster/cluster_impl"
-	_ "dubbo.apache.org/dubbo-go/v3/cluster/loadbalance"
-	"dubbo.apache.org/dubbo-go/v3/common/logger"
-	_ "dubbo.apache.org/dubbo-go/v3/common/proxy/proxy_factory"
 	"dubbo.apache.org/dubbo-go/v3/config"
-	_ "dubbo.apache.org/dubbo-go/v3/filter/filter_impl"
-	_ "dubbo.apache.org/dubbo-go/v3/protocol/dubbo3"
-	_ "dubbo.apache.org/dubbo-go/v3/registry/nacos"
-	_ "dubbo.apache.org/dubbo-go/v3/registry/protocol"
-	_ "dubbo.apache.org/dubbo-go/v3/registry/zookeeper"
+	_ "dubbo.apache.org/dubbo-go/v3/imports"
 )
 
 import (
-	"github.com/dubbogo/triple/example/dubbo/go-server/pkg"
+	"github.com/dubbogo/triple/example/dubbo/proto"
+	tripleConstant "github.com/dubbogo/triple/pkg/common/constant"
 	_ "github.com/dubbogo/triple/pkg/triple"
 )
 
@@ -56,7 +51,7 @@ func init() {
 
 // need to setup environment variable "CONF_PROVIDER_FILE_PATH" to "conf/server.yml" before run
 func main() {
-	config.SetProviderService(pkg.NewGreeterProvider())
+	config.SetProviderService(&GreeterProvider{})
 	go func() {
 		_ = http.ListenAndServe("0.0.0.0:6060", nil)
 	}()
@@ -86,4 +81,37 @@ func initSignal() {
 			return
 		}
 	}
+}
+
+
+
+type GreeterProvider struct {
+	proto.GreeterProviderBase
+}
+
+func (s *GreeterProvider) SayHelloStream(svr proto.Greeter_SayHelloStreamServer) error {
+	c, err := svr.Recv()
+	if err != nil {
+		return err
+	}
+	logger.Infof("Dubbo-go3 GreeterProvider recv 1 user, name = %s\n", c.Name)
+
+	err = svr.Send(&proto.User{
+		Name: "hello " + c.Name,
+		Age:  18,
+		Id:   "123456789",
+	})
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GreeterProvider) SayHello(ctx context.Context, in *proto.HelloRequest) (*proto.User, error) {
+	logger.Infof("Dubbo3 GreeterProvider get user name = %s\n" + in.Name)
+	fmt.Println("get triple header tri-req-id = ", ctx.Value(tripleConstant.TripleCtxKey(tripleConstant.TripleRequestID)))
+	time.Sleep(time.Second * 1)
+	fmt.Println("get triple header tri-service-version = ", ctx.Value(tripleConstant.TripleCtxKey(tripleConstant.TripleServiceVersion)))
+	return &proto.User{Name: in.Name, Id: "12345", Age: 21}, nil
 }

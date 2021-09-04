@@ -3,12 +3,12 @@
     <module name="triple" />
     <working_directory value="$PROJECT_DIR$/example/dubbo/go-client" />
     <envs>
-      <env name="CONF_CONSUMER_FILE_PATH" value="$PROJECT_DIR$/example/dubbo/go-client/conf/client.yml" />
+      <env name="DUBBO_GO_CONFIG_PATH" value="$PROJECT_DIR$/example/dubbo/go-client/conf/dubbogo.yml" />
     </envs>
     <kind value="PACKAGE" />
-    <filePath value="$PROJECT_DIR$/example/dubbo/go-client/client.go" />
     <package value="github.com/dubbogo/triple/example/dubbo/go-client/cmd" />
     <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/example/dubbo/go-client/client.go" />
     <method v="2" />
   </configuration>
 </component>

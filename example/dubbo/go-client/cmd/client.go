@@ -19,6 +19,7 @@ package main
 
 import (
 	"context"
+	"dubbo.apache.org/dubbo-go/v3/common/logger"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
@@ -28,26 +29,17 @@ import (
 )
 
 import (
-	_ "dubbo.apache.org/dubbo-go/v3/cluster/cluster_impl"
-	_ "dubbo.apache.org/dubbo-go/v3/cluster/loadbalance"
-	"dubbo.apache.org/dubbo-go/v3/common/logger"
-	_ "dubbo.apache.org/dubbo-go/v3/common/proxy/proxy_factory"
 	"dubbo.apache.org/dubbo-go/v3/config"
-	_ "dubbo.apache.org/dubbo-go/v3/filter/filter_impl"
-	_ "dubbo.apache.org/dubbo-go/v3/protocol/dubbo3"
-	_ "dubbo.apache.org/dubbo-go/v3/protocol/grpc"
-	_ "dubbo.apache.org/dubbo-go/v3/registry/protocol"
-	_ "dubbo.apache.org/dubbo-go/v3/registry/zookeeper"
-
+	_ "dubbo.apache.org/dubbo-go/v3/imports"
 	"go.uber.org/atomic"
 )
 
 import (
-	"github.com/dubbogo/triple/example/dubbo/go-client/pkg"
+	"github.com/dubbogo/triple/example/dubbo/proto"
 	tripleConstant "github.com/dubbogo/triple/pkg/common/constant"
 )
 
-var greeterProvider = new(pkg.GreeterClientImpl)
+var greeterProvider = new(proto.GreeterClientImpl)
 
 func init() {
 	config.SetConsumerService(greeterProvider)
@@ -75,7 +67,7 @@ func testSayHello() {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, tripleConstant.TripleCtxKey(tripleConstant.TripleRequestID), "triple-request-id-demo")
 
-	req := pkg.HelloRequest{
+	req := proto.HelloRequest{
 		Name: "laurence",
 	}
 	user, err := greeterProvider.SayHello(ctx, &req)
@@ -92,7 +84,7 @@ func testSayHelloWithHighParallel() {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, tripleConstant.TripleCtxKey(tripleConstant.TripleRequestID), "triple-request-id-demo")
 
-	req := pkg.HelloRequest{
+	req := proto.HelloRequest{
 		Name: "laurence",
 	}
 	for {
@@ -126,7 +118,7 @@ func testSayHelloStream() {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, tripleConstant.TripleCtxKey(tripleConstant.TripleRequestID), "triple-request-id-demo")
 
-	req := pkg.HelloRequest{
+	req := proto.HelloRequest{
 		Name: "laurence",
 	}
 
@@ -135,7 +127,7 @@ func testSayHelloStream() {
 		panic(err)
 	}
 
-	var user *pkg.User
+	var user *proto.User
 	err = client.Send(&req)
 	if err != nil {
 		panic(err)
