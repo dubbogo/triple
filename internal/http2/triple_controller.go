@@ -399,6 +399,7 @@ func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, r
 		return *common.NewErrorWithAttachment(err, attachment)
 	}
 
+
 	headerHandler, _ := common.GetProtocolHeaderHandler(hc.option, ctx)
 	newHeader := http.Header{}
 	newHeader = headerHandler.WriteTripleReqHeaderField(newHeader)

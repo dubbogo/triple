@@ -13,6 +13,7 @@ require (
 	go.uber.org/zap v1.16.0
 	google.golang.org/genproto v0.0.0-20210106152847-07624b53cd92
 	google.golang.org/grpc v1.36.0
+	github.com/satori/go.uuid v1.2.0
 	google.golang.org/protobuf v1.26.0
 	gotest.tools v2.2.0+incompatible
 )
