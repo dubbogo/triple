@@ -12,5 +12,3 @@ require (
 )
 
 replace github.com/dubbogo/triple => ../
-
-replace dubbo.apache.org/dubbo-go/v3 => ../../dubbo-go

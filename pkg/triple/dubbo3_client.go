@@ -76,7 +76,7 @@ func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error
 }
 
 // Invoke call remote using stub
-func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply interface{}) (common.TripleAttachment, error) {
+func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply interface{}) common.ErrorWithAttachment {
 	attachment := make(common.TripleAttachment)
 	var err error
 
@@ -86,12 +86,12 @@ func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply inter
 		errWithAtta, ok := res[1].Interface().(*common.ErrorWithAttachment)
 		if ok {
 			if errWithAtta.GetError() != nil {
-				return attachment, errWithAtta.GetError()
+				return *common.NewErrorWithAttachment(errWithAtta.GetError(), attachment)
 			}
 			attachment = errWithAtta.GetAttachments()
-			// 兼容性处理，针对未更新的stub
 		} else if res[1].IsValid() && res[1].Interface() != nil {
-			return attachment, res[1].Interface().(error)
+			// compatible with not updated triple stub
+			return *common.NewErrorWithAttachment(res[1].Interface().(error), attachment)
 		}
 		_ = tools.ReflectResponse(res[0], reply)
 	} else {
@@ -105,10 +105,10 @@ func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply inter
 		}
 		attachment, err = t.Request(ctx, "/"+interfaceKey+"/"+methodName, reqParams, reply)
 		if err != nil {
-			return attachment, err
+			return *common.NewErrorWithAttachment(err, attachment)
 		}
 	}
-	return attachment, nil
+	return *common.NewErrorWithAttachment(nil, attachment)
 }
 
 // Request call h2Controller to send unary rpc req to server
