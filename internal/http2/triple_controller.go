@@ -388,7 +388,7 @@ func (hc *TripleController) StreamInvoke(ctx context.Context, path string) (grpc
 }
 
 // UnaryInvoke can start unary invocation, called by dubbo3 client, with @path and request @data
-func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, reply interface{}) (common.TripleAttachment, error) {
+func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, reply interface{}) common.ErrorWithAttachment {
 	var code int
 	var msg string
 	var attachment = make(common.TripleAttachment)
@@ -396,7 +396,7 @@ func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, r
 	sendData, err := hc.twoWayCodec.MarshalRequest(arg)
 	if err != nil {
 		hc.option.Logger.Errorf("client request marshal error = %v", err)
-		return attachment, err
+		return *common.NewErrorWithAttachment(err, attachment)
 	}
 
 	headerHandler, _ := common.GetProtocolHeaderHandler(hc.option, ctx)
@@ -411,7 +411,7 @@ func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, r
 	})
 	if err != nil {
 		hc.option.Logger.Error("triple unary invoke path" + path + " with addr = " + hc.address + " error = " + err.Error())
-		return attachment, err
+		return *common.NewErrorWithAttachment(err, attachment)
 	}
 
 	for k, v := range rspTrailerHeader {
@@ -423,7 +423,7 @@ func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, r
 			code, err = strconv.Atoi(v[0])
 			if err != nil {
 				hc.option.Logger.Errorf("get trailer err = %v", err)
-				return attachment, perrors.Errorf("get trailer err = %v", err)
+				return *common.NewErrorWithAttachment(perrors.Errorf("get trailer err = %v", err), attachment)
 			}
 		case constant.TrailerKeyGrpcMessage:
 			msg = rspTrailerHeader.Get(v[0])
@@ -434,15 +434,15 @@ func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, r
 
 	if codes.Code(code) != codes.OK {
 		hc.option.Logger.Errorf("grpc status not success, msg = %s, code = %d", msg, code)
-		return attachment, perrors.Errorf("grpc status not success, msg = %s, code = %d", msg, code)
+		return *common.NewErrorWithAttachment(perrors.Errorf("grpc status not success, msg = %s, code = %d", msg, code), attachment)
 	}
 
 	// all split data are collected and to unmarshal
 	if err := hc.twoWayCodec.UnmarshalResponse(rspData, reply); err != nil {
 		hc.option.Logger.Errorf("client unmarshal rsp err= %v\n", err)
-		return attachment, err
+		return *common.NewErrorWithAttachment(err, attachment)
 	}
-	return attachment, nil
+	return *common.NewErrorWithAttachment(nil, attachment)
 }
 
 // Destroy destroys TripleController and force close all related goroutine

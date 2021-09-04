@@ -78,12 +78,10 @@ func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error
 // Invoke call remote using stub
 func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply interface{}) common.ErrorWithAttachment {
 	attachment := make(common.TripleAttachment)
-	var err error
-
 	if t.opt.CodecType == constant.PBCodecName {
 		method := t.stubInvoker.MethodByName(methodName)
 		res := method.Call(in)
-		errWithAtta, ok := res[1].Interface().(*common.ErrorWithAttachment)
+		errWithAtta, ok := res[1].Interface().(common.ErrorWithAttachment)
 		if ok {
 			if errWithAtta.GetError() != nil {
 				return *common.NewErrorWithAttachment(errWithAtta.GetError(), attachment)
@@ -103,10 +101,7 @@ func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply inter
 				reqParams = append(reqParams, v.Interface())
 			}
 		}
-		attachment, err = t.Request(ctx, "/"+interfaceKey+"/"+methodName, reqParams, reply)
-		if err != nil {
-			return *common.NewErrorWithAttachment(err, attachment)
-		}
+		return t.Request(ctx, "/"+interfaceKey+"/"+methodName, reqParams, reply)
 	}
 	return *common.NewErrorWithAttachment(nil, attachment)
 }
@@ -114,7 +109,7 @@ func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply inter
 // Request call h2Controller to send unary rpc req to server
 // @path is /interfaceKey/functionName e.g. /com.apache.dubbo.sample.basic.IGreeter/BigUnaryTest
 // @arg is request body
-func (t *TripleClient) Request(ctx context.Context, path string, arg, reply interface{}) (common.TripleAttachment, error) {
+func (t *TripleClient) Request(ctx context.Context, path string, arg, reply interface{}) common.ErrorWithAttachment {
 	return t.h2Controller.UnaryInvoke(ctx, path, arg, reply)
 }
 

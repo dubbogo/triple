@@ -175,11 +175,10 @@ func (c *greeterDubbo3Client) SayHelloStream(ctx context.Context, opts ...grpc.C
 	x := &greeterSayHelloStreamClient{stream}
 	return x, nil
 }
-func (c *greeterDubbo3Client) SayHello(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*User, *common.ErrorWithAttachment) {
+func (c *greeterDubbo3Client) SayHello(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*User, common.ErrorWithAttachment) {
 	out := new(User)
 	interfaceKey := ctx.Value(tripleConstant.InterfaceKey).(string)
-	attachment, err := c.cc.Invoke(ctx, "/"+interfaceKey+"/SayHello", in, out)
-	return out, common.NewErrorWithAttachment(err, attachment)
+	return out, c.cc.Invoke(ctx, "/"+interfaceKey+"/SayHello", in, out)
 }
 
 // GreeterClientImpl is the client API for Greeter service.

@@ -39,7 +39,7 @@ type TripleConn struct {
 // Invoke called by unary rpc 's pb.go file in dubbo-go 3.0 design
 // @method is /interfaceKey/functionName e.g. /com.apache.dubbo.sample.basic.IGreeter/BigUnaryTest
 // @arg is request body, must be proto.Message type
-func (t *TripleConn) Invoke(ctx context.Context, method string, args, reply interface{}, opts ...grpc.CallOption) (common.TripleAttachment, error) {
+func (t *TripleConn) Invoke(ctx context.Context, method string, args, reply interface{}, opts ...grpc.CallOption) common.ErrorWithAttachment {
 	return t.client.Request(ctx, method, args, reply)
 }
 
