@@ -6,8 +6,6 @@ package proto
 import (
 	context "context"
 	fmt "fmt"
-	proto "github.com/golang/protobuf/proto"
-	grpc "google.golang.org/grpc"
 	math "math"
 )
 
@@ -15,6 +13,13 @@ import (
 	"dubbo.apache.org/dubbo-go/v3/protocol"
 	dgrpc "dubbo.apache.org/dubbo-go/v3/protocol/dubbo3"
 	"dubbo.apache.org/dubbo-go/v3/protocol/invocation"
+
+	proto "github.com/golang/protobuf/proto"
+
+	grpc "google.golang.org/grpc"
+)
+
+import (
 	"github.com/dubbogo/triple/pkg/common"
 	tripleConstant "github.com/dubbogo/triple/pkg/common/constant"
 	dubbo3 "github.com/dubbogo/triple/pkg/triple"

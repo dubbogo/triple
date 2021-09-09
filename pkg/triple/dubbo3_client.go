@@ -28,7 +28,9 @@ import (
 )
 
 import (
+	"github.com/dubbogo/triple/internal/codes"
 	"github.com/dubbogo/triple/internal/http2"
+	"github.com/dubbogo/triple/internal/status"
 	"github.com/dubbogo/triple/internal/tools"
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
@@ -77,24 +79,36 @@ func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error
 
 // Invoke call remote using stub
 func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply interface{}) common.ErrorWithAttachment {
+	t.opt.Logger.Debugf("TripleClient.Invoke: methodName = %s, inputValue = %+v, expected reply struct = %+v, client defined codec = %s",
+		methodName, in, reply, t.opt.CodecType)
 	attachment := make(common.TripleAttachment)
 	if t.opt.CodecType == constant.PBCodecName {
 		method := t.stubInvoker.MethodByName(methodName)
+		if method.IsZero() {
+			t.opt.Logger.Errorf("TripleClient.Invoke: methodName %s not impl in triple client api.", methodName)
+			return *common.NewErrorWithAttachment(status.Errorf(codes.Unimplemented, "TripleClient.Invoke: methodName %s not impl in triple client api.", methodName), attachment)
+		}
 		res := method.Call(in)
 		errWithAtta, ok := res[1].Interface().(common.ErrorWithAttachment)
 		if ok {
+			t.opt.Logger.Debugf("TripleClient.Invoke: get result final struct is common.ErrorWithAttachment")
 			if errWithAtta.GetError() != nil {
+				t.opt.Logger.Debugf("TripleClient.Invoke: get result errorWithAttachment, error = %s", errWithAtta.GetError())
 				return *common.NewErrorWithAttachment(errWithAtta.GetError(), attachment)
 			}
 			attachment = errWithAtta.GetAttachments()
+			t.opt.Logger.Debugf("TripleClient.Invoke: get response attachement = %+v", attachment)
 		} else if res[1].IsValid() && res[1].Interface() != nil {
 			// compatible with not updated triple stub
+			t.opt.Logger.Debugf("TripleClient.Invoke: get result final struct is error = %s", res[1].Interface().(error))
 			return *common.NewErrorWithAttachment(res[1].Interface().(error), attachment)
 		}
+		t.opt.Logger.Debugf("TripleClient.Invoke: get reply = %+v", res[0])
 		_ = tools.ReflectResponse(res[0], reply)
 	} else {
 		ctx := in[0].Interface().(context.Context)
 		interfaceKey := ctx.Value(constant.InterfaceKey).(string)
+		t.opt.Logger.Debugf("TripleClient.Invoke: call with interfaceKey = %s", interfaceKey)
 		reqParams := make([]interface{}, 0, len(in)-1)
 		for idx, v := range in {
 			if idx > 0 {

@@ -93,7 +93,7 @@ func (hc *TripleController) GetHandler(rpcService interface{}) http2.Handler {
 			traceProtoBin is uint type, triple defined header.
 		*/
 
-		hc.option.Logger.Debugf("receive http2 path = %s", path)
+		hc.option.Logger.Debugf("TripleController.http2HandlerFunction: receive http2 path = %s, header = %+v", path, header)
 
 		if err := hc.pool.Submit(func() {
 			var (
@@ -110,7 +110,7 @@ func (hc *TripleController) GetHandler(rpcService interface{}) http2.Handler {
 			// new server stream
 			st, err := hc.newServerStreamFromTripleHeader(ctx, path, header, rpcService, hc.pool)
 			if st == nil || err != nil {
-				hc.option.Logger.Errorf("creat server stream error = %v\n", err)
+				hc.option.Logger.Errorf("TripleController.http2HandlerFunction: creat server stream error = %s\n", err)
 				tripleStatus, _ = status.FromError(err)
 				close(sendChan)
 				hc.handleStatusAttachmentAndResponse(tripleStatus, nil, ctrlch)
@@ -138,7 +138,7 @@ func (hc *TripleController) GetHandler(rpcService interface{}) http2.Handler {
 			}
 			if err := hc.pool.Submit(sendToStream); err != nil {
 				close(sendChan)
-				hc.option.Logger.Warnf("go routine pool full with error = %v", err)
+				hc.option.Logger.Warnf("TripleController.http2HandlerFunction: go routine pool full with error = %v", err)
 				hc.handleStatusAttachmentAndResponse(status.New(codes.ResourceExhausted, fmt.Sprintf("go routine pool full with error = %v", err)), nil, ctrlch)
 				return
 			}
@@ -174,7 +174,7 @@ func (hc *TripleController) GetHandler(rpcService interface{}) http2.Handler {
 				rspHeader["content-type"] = []string{constant.TripleContentType}
 				ctrlch <- rspHeader
 				close(sendChan)
-				hc.option.Logger.Warnf("go routine pool full with error = %v", err)
+				hc.option.Logger.Warnf("TripleController.http2HandlerFunction: failed to occupy worker goroutine, go routine pool full with error = %v", err)
 				hc.handleStatusAttachmentAndResponse(status.New(codes.ResourceExhausted, fmt.Sprintf("go routine pool full with error = %v", err)), nil, ctrlch)
 			}()
 		}
@@ -183,6 +183,8 @@ func (hc *TripleController) GetHandler(rpcService interface{}) http2.Handler {
 
 func (hc *TripleController) handleStatusAttachmentAndResponse(tripleStatus *status.Status, attachment map[string]string, ctrlch chan http.Header) {
 	// second response header with trailer fields
+	hc.option.Logger.Debugf("TripleController.handleStatusAttachmentAndResponse: with response tripleStatus = %+v,"+
+		"attachment = %+v", tripleStatus.Proto(), attachment)
 	rspTrialer := make(map[string][]string)
 	rspTrialer[constant.TrailerKeyGrpcStatus] = []string{strconv.Itoa(int(tripleStatus.Code()))} //[]string{strconv.Itoa(int(tripleStatus.Code()))}
 	rspTrialer[constant.TrailerKeyGrpcMessage] = []string{tripleStatus.Message()}
@@ -270,55 +272,62 @@ func (hc *TripleController) newServerStreamFromTripleHeader(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
+	hc.option.Logger.Debugf("TripleController.newServerStreamFromTripleHeader: with interfaceKey = %s, methodName = %s"+
+		"server defined serialization type = %s", interfaceKey, methodName, hc.option.CodecType)
 
 	var newStream stream.Stream
 	triHeader := codec.NewTripleHeader(path, header)
+	hc.option.Logger.Debugf("TripleController.newServerStreamFromTripleHeader: parse triple header = %+v", triHeader)
 
 	// creat server stream
 	if hc.option.CodecType == constant.PBCodecName {
 		service, ok := rpcService.(common.TripleGrpcService)
 		if !ok {
+			hc.option.Logger.Errorf("TripleController.newServerStreamFromTripleHeader: can't assert impl of interface %s to TripleGrpcService", interfaceKey)
 			return nil, status.Err(codes.Internal, "can't assert impl of interface "+interfaceKey+" to TripleGrpcService")
 		}
 		// pb twoWayCodec needs grpc.Desc to do method discovery, allowing unary and streaming invocation
+		// todo the maps can be cached to save time
 		methodMap, streamMap, err := getMethodAndStreamDescMap(service)
 		if err != nil {
-			hc.option.Logger.Error("new H2 controller error:", err)
+			hc.option.Logger.Errorf("TripleController.newServerStreamFromTripleHeader: new H2 controller error: %s", err)
 			return nil, status.Err(codes.Unimplemented, err.Error())
 		}
 		unaryRPCDiscovery, unaryOk := methodMap[methodName]
 		streamRPCDiscovery, streamOk := streamMap[methodName]
 
 		if unaryOk {
+			hc.option.Logger.Debugf("TripleController.newServerStreamFromTripleHeader: find unary rpc impl in server")
 			newStream, err = stream.NewServerStreamForPB(ctx, triHeader, unaryRPCDiscovery, hc.option,
 				pool, service, hc.twoWayCodec)
 			if err != nil {
-				hc.option.Logger.Errorf("newServerStream error = %v", err)
+				hc.option.Logger.Errorf("TripleController.newServerStreamFromTripleHeader: newServerStream error = %v", err)
 				return nil, err
 			}
 		} else if streamOk {
+			hc.option.Logger.Debugf("TripleController.newServerStreamFromTripleHeader: find streaming rpc impl in server")
 			newStream, err = stream.NewServerStreamForPB(ctx, triHeader, streamRPCDiscovery, hc.option,
 				pool, service, hc.twoWayCodec)
 			if err != nil {
-				hc.option.Logger.Errorf("newServerStream error = %v", err)
+				hc.option.Logger.Errorf("TripleController.newServerStreamFromTripleHeader: newServerStream error = %v", err)
 				return nil, err
 			}
 		} else {
-			hc.option.Logger.Errorf("method name %s not found in desc\n", methodName)
+			hc.option.Logger.Errorf("TripleController.newServerStreamFromTripleHeader: method name %s not found in desc\n", methodName)
 			return nil, status.Errorf(codes.Unimplemented, "method name %s not found in desc", methodName)
 		}
 
 	} else {
 		service, ok := rpcService.(common.TripleUnaryService)
 		if !ok {
-			hc.option.Logger.Errorf("can't assert impl of interface %s service %+v to TripleUnaryService", interfaceKey, rpcService)
+			hc.option.Logger.Errorf("TripleController.newServerStreamFromTripleHeader: can't assert impl of interface %s service %+v to TripleUnaryService", interfaceKey, rpcService)
 			return nil, status.Errorf(codes.Internal, "can't assert impl of interface %s service %+v to TripleUnaryService", interfaceKey, rpcService)
 		}
 		// unary service doesn't need to use grpc.Desc, and now only support unary invocation
 		var err error
 		newStream, err = stream.NewServerStreamForNonPB(ctx, triHeader, hc.option, pool, service, hc.twoWayCodec, hc.genericCodec)
 		if err != nil {
-			hc.option.Logger.Errorf("unary service new server stream error = %v", err)
+			hc.option.Logger.Errorf("TripleController.newServerStreamFromTripleHeader: unary service new server stream error = %v", err)
 			return nil, err
 		}
 	}
@@ -393,9 +402,10 @@ func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, r
 	var msg string
 	var attachment = make(common.TripleAttachment)
 
+	hc.option.Logger.Debugf("TripleController.UnaryInvoke: with path = %s, args = %+v, reply = %+v", path, arg, reply)
 	sendData, err := hc.twoWayCodec.MarshalRequest(arg)
 	if err != nil {
-		hc.option.Logger.Errorf("client request marshal error = %v", err)
+		hc.option.Logger.Errorf("TripleController.UnaryInvoke: client request marshal error = %v", err)
 		return *common.NewErrorWithAttachment(err, attachment)
 	}
 
@@ -410,9 +420,10 @@ func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, r
 		HeaderField: newHeader,
 	})
 	if err != nil {
-		hc.option.Logger.Error("triple unary invoke path" + path + " with addr = " + hc.address + " error = " + err.Error())
+		hc.option.Logger.Error("TripleController.UnaryInvoke: triple unary invoke path" + path + " with addr = " + hc.address + " error = " + err.Error())
 		return *common.NewErrorWithAttachment(err, attachment)
 	}
+	hc.option.Logger.Debugf("TripleController.UnaryInvoke: triple unary invoke get rsp data = %s, trailerHeader = %+v", string(rspData), rspTrailerHeader)
 
 	for k, v := range rspTrailerHeader {
 		if len(v) == 0 {
@@ -422,8 +433,8 @@ func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, r
 		case constant.TrailerKeyGrpcStatus:
 			code, err = strconv.Atoi(v[0])
 			if err != nil {
-				hc.option.Logger.Errorf("get trailer err = %v", err)
-				return *common.NewErrorWithAttachment(perrors.Errorf("get trailer err = %v", err), attachment)
+				hc.option.Logger.Errorf("TripleController.UnaryInvoke: get trailer err = %v", err)
+				return *common.NewErrorWithAttachment(perrors.Errorf("TripleController.UnaryInvoke: get trailer err = %v", err), attachment)
 			}
 		case constant.TrailerKeyGrpcMessage:
 			msg = rspTrailerHeader.Get(v[0])
@@ -433,8 +444,8 @@ func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, r
 	}
 
 	if codes.Code(code) != codes.OK {
-		hc.option.Logger.Errorf("grpc status not success, msg = %s, code = %d", msg, code)
-		return *common.NewErrorWithAttachment(perrors.Errorf("grpc status not success, msg = %s, code = %d", msg, code), attachment)
+		hc.option.Logger.Errorf("TripleController.UnaryInvoke: triple status not success, msg = %s, code = %d", msg, code)
+		return *common.NewErrorWithAttachment(perrors.Errorf("TripleController.UnaryInvoke: triple status not success, msg = %s, code = %d", msg, code), attachment)
 	}
 
 	// all split data are collected and to unmarshal

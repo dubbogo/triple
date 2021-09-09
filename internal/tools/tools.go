@@ -44,7 +44,7 @@ func AddDefaultOption(opt *config.Option) *config.Option {
 	return opt
 }
 
-// nolint
+// GetServiceKeyAndUpperCaseMethodNameFromPath todo call this function time, once to save time
 func GetServiceKeyAndUpperCaseMethodNameFromPath(path string) (string, string, error) {
 	paramList := strings.Split(path, "/")
 	if len(paramList) < 3 {

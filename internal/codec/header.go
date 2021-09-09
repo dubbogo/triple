@@ -21,7 +21,6 @@ import (
 	"context"
 	"net/http"
 	"net/textproto"
-	"strconv"
 	"strings"
 )
 
@@ -166,15 +165,12 @@ func (t *TripleHeaderHandler) WriteTripleReqHeaderField(header http.Header) http
 		header["authorization"] = v
 	}
 
+	t.Opt.Logger.Debugf("TripleHeaderHandler.WriteTripleReqHeaderField: create header = %+v", header)
 	return header
 }
 
 // WriteTripleFinalRspHeaderField returns trailers header fields that triple and grpc defined
 func (t *TripleHeaderHandler) WriteTripleFinalRspHeaderField(w http.ResponseWriter, grpcStatusCode int, grpcMessage string, traceProtoBin int) {
-	w.Header().Set(constant.TrailerKeyGrpcStatus, strconv.Itoa(grpcStatusCode)) // sendMsg.st.Code()
-	w.Header().Set(constant.TrailerKeyGrpcMessage, grpcMessage)                 //encodeGrpcMessage(""))
-	// todo now if add this field, java-provider may caused unexpected error.
-	//w.Header().Set(TrailerKeyTraceProtoBin, strconv.Itoa(traceProtoBin)) // sendMsg.st.Code()
 }
 
 // getCtxVaSave get key @fields value and return, if not exist, return empty string
@@ -220,5 +216,6 @@ func (t *TripleHeaderHandler) ReadFromTripleReqHeader(r *http.Request) h2Triple.
 			tripleHeader.Attachment[strings.ToLower(k)] = v[0]
 		}
 	}
+	t.Opt.Logger.Debugf("TripleHeaderHandler.ReadFromTripleReqHeader read meta header field from h2 header = %+v", tripleHeader)
 	return tripleHeader
 }

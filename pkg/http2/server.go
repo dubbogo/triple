@@ -173,6 +173,7 @@ func (s *Server) run() {
 
 // handleRawConn create a H2 Controller to deal with new conn
 func (s *Server) handleRawConn(conn net.Conn) error {
+	s.logger.Debugf("Triple Server get new tcp conn")
 	srv := &http2.Server{}
 	opts := &http2.ServeConnOpts{Handler: http.HandlerFunc(s.http2HandleFunction)}
 	srv.ServeConn(conn, opts)
@@ -346,11 +347,6 @@ func writeTripleFinalRspHeaderField(w *http2.Http2ResponseWriter, trailer http.H
 		w.Header().Add(http2.TrailerPrefix+k, v[0])
 	}
 	w.FlushTrailer()
-	//for k, v := range trailer {
-	//	if len(v) > 0 {
-	//		w.Header().Set(k, v[0])
-	//	}
-	//}
 }
 
 type defaultPathExtractor struct {
