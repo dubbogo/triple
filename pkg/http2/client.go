@@ -111,6 +111,7 @@ func (h *Client) StreamPost(addr, path string, sendChan chan *bytes.Buffer, opts
 }
 
 func (h *Client) Post(addr, path string, data []byte, opts *config.PostConfig) ([]byte, http.Header, error) {
+	h.logger.Debugf("http2.Client.Post: with addr = %s, path = %s, data = %s, opts = %+v", addr, path, string(data), opts)
 	sendStreamChan := make(chan h2Triple.BufferMsg, 2)
 
 	sendStreamChan <- h2Triple.BufferMsg{
@@ -131,7 +132,7 @@ func (h *Client) Post(addr, path string, data []byte, opts *config.PostConfig) (
 
 	rsp, err := h.client.Post("https://"+addr+path, opts.ContentType, &stremaReq)
 	if err != nil {
-		h.logger.Errorf("dubbo3 http2 post err = %v\n", err)
+		h.logger.Errorf("http2.Client.Post: dubbo3 http2 post err = %v\n", err)
 		return nil, nil, err
 	}
 
@@ -163,7 +164,7 @@ func (h *Client) Post(addr, path string, data []byte, opts *config.PostConfig) (
 			n, err = rsp.Body.Read(readBuf)
 			if err != nil {
 				if err.Error() != "EOF" {
-					h.logger.Errorf("dubbo3 unary invoke read error = %v\n", err)
+					h.logger.Errorf("http2.Client.Post: dubbo3 unary invoke read error = %v\n", err)
 				}
 				// [normal close], read finished or no read body, return
 				return
@@ -202,8 +203,8 @@ Loop:
 			}
 			splitBuffer.Write(splitedData)
 			if splitBuffer.Len() > int(fromFrameHeaderDataSize) {
-				h.logger.Error("dubbo3 unary invoke error = Receive Splited Data is bigger than wanted.")
-				return nil, nil, perrors.New("dubbo3 unary invoke error = Receive Splited Data is bigger than wanted.")
+				h.logger.Error("http2.Client.Post: dubbo3 unary invoke error = Receive Splited Data is bigger than wanted.")
+				return nil, nil, perrors.New("http2.Client.Post: dubbo3 unary invoke error = Receive Splited Data is bigger than wanted.")
 			}
 
 			if splitBuffer.Len() == int(fromFrameHeaderDataSize) {
@@ -229,8 +230,8 @@ Loop:
 	}
 
 	if timeoutFlag {
-		h.logger.Error("http2 unary call" + path + " with addr = " + addr + " timeout")
-		return nil, nil, perrors.Errorf("http2 unary call %s timeout", path)
+		h.logger.Error("http2.Client.Post: http2 unary call" + path + " with addr = " + addr + " timeout")
+		return nil, nil, perrors.Errorf("http2.Client.Post: http2 unary call %s timeout", path)
 	}
 
 	select {
@@ -241,8 +242,8 @@ Loop:
 	}
 
 	if timeoutFlag {
-		h.logger.Error("http2 unary call" + path + " with addr = " + addr + " timeout")
-		return nil, nil, perrors.Errorf("http2 unary call %s timeout", path)
+		h.logger.Error("http2.Client.Post: http2 unary call" + path + " with addr = " + addr + " timeout")
+		return nil, nil, perrors.Errorf("http2.Client.Post: http2 unary call %s timeout", path)
 	}
 
 	return splitBuffer.Bytes(), trailer, nil

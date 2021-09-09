@@ -56,7 +56,7 @@ func (t *TripleServer) Stop() {
 
 // Start can start a triple server
 func (t *TripleServer) Start() {
-	t.opt.Logger.Debug("tripleServer Start at ", t.opt.Location)
+	t.opt.Logger.Debug("TripleServer.Start: tripleServer Start at location = ", t.opt.Location)
 
 	t.http2Server = triHttp2.NewServer(t.opt.Location, triHttp2Conf.ServerConfig{
 		Logger:                 t.opt.Logger,
@@ -65,11 +65,12 @@ func (t *TripleServer) Start() {
 	})
 	tripleCtl, err := http2.NewTripleController(t.opt)
 	if err != nil {
-		t.opt.Logger.Error("new http2 controller failed with error = %v", err)
+		t.opt.Logger.Error("TripleServer.Start: new http2 controller failed with error = %v", err)
 		return
 	}
 
 	t.rpcServiceMap.Range(func(key, value interface{}) bool {
+		t.opt.Logger.Debugf("TripleServer.Start: http2 register path = %s, with service = %+v", key.(string), value)
 		t.http2Server.RegisterHandler(key.(string), tripleCtl.GetHandler(value))
 		return true
 	})
@@ -78,13 +79,15 @@ func (t *TripleServer) Start() {
 }
 
 func (t *TripleServer) RefreshService() {
+	t.opt.Logger.Debugf("TripleServer.Refresh: call refresh services")
 	tripleCtl, err := http2.NewTripleController(t.opt)
 	if err != nil {
-		t.opt.Logger.Error("new http2 controller failed with error = %v", err)
+		t.opt.Logger.Errorf("TripleServer.Refresh: new http2 controller failed with error = %v", err)
 		return
 	}
 
 	t.rpcServiceMap.Range(func(key, value interface{}) bool {
+		t.opt.Logger.Debugf("TripleServer.Refresh: http2 register path = %s, with service = %+v", key.(string), value)
 		t.http2Server.RegisterHandler(key.(string), tripleCtl.GetHandler(value))
 		return true
 	})

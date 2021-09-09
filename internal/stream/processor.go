@@ -111,6 +111,7 @@ func newUnaryProcessor(s *serverStream, desc grpc.MethodDesc, serializer common.
 // processUnaryRPC processes unary rpc
 func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, header h2Triple.ProtocolHeader) ([]byte, common.ErrorWithAttachment) {
 	readBuf := buf.Bytes()
+	p.opt.Logger.Debugf("unaryProcessor.processUnaryRPC: with readBuffer to be unmarshal = %s, header = %+v, server defined serialization type = %s", string(readBuf), header, p.opt.CodecType)
 
 	var rawReplyStruct interface{}
 	var reply interface{}
@@ -119,24 +120,24 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 
 	_, methodName, e := tools.GetServiceKeyAndUpperCaseMethodNameFromPath(header.GetPath())
 	if e != nil {
-		p.opt.Logger.Errorf("invalid http2 path = %s, error = %s", header.GetPath(), e.Error())
+		p.opt.Logger.Errorf("unaryProcessor.processUnaryRPC: invalid http2 path = %s, error = %s", header.GetPath(), e.Error())
 		return nil, *common.NewErrorWithAttachment(e, nil)
 	}
-
+	p.opt.Logger.Debugf("unaryProcessor.processUnaryRPC: get parsed golang methodName = %s", methodName)
 	if p.opt.CodecType == constant.PBCodecName {
 		descFunc := func(v interface{}) error {
 			if err = p.twoWayCodec.UnmarshalRequest(readBuf, v); err != nil {
-				p.opt.Logger.Errorf("Unary rpc request unmarshal error: %s", err)
+				p.opt.Logger.Errorf("unaryProcessor.processUnaryRPC: Unary rpc request unmarshal error: %s", err)
 				return status.Errorf(codes.Internal, "Unary rpc request unmarshal error: %s", err)
 			}
 			return nil
 		}
-		p.opt.Logger.Debugf("unary invoke pb service method %s with header %+v", methodName, header)
+		p.opt.Logger.Debugf("unaryProcessor.processUnaryRPC: unary invoke pb service method %s with header %+v", methodName, header)
 		reply, err = p.methodDesc.Handler(service, header.FieldToCtx(), descFunc, nil)
 	} else {
 		unaryService, ok := service.(common.TripleUnaryService)
 		if !ok {
-			p.opt.Logger.Errorf("msgpack provider service %+v doesn't impl TripleUnaryService", service)
+			p.opt.Logger.Errorf("unaryProcessor.processUnaryRPC: msgpack provider service %+v doesn't impl TripleUnaryService", service)
 			return nil, *common.NewErrorWithAttachment(status.Errorf(codes.Internal, "msgpack provider service %+v doesn't impl TripleUnaryService", service), responseAttachment)
 		}
 
@@ -144,20 +145,20 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 			var args []interface{}
 			args, err = p.genericCodec.UnmarshalRequest(readBuf)
 			if err != nil {
-				p.opt.Logger.Errorf("generic invoke with request %s unmarshal error = %s", string(readBuf), err.Error())
+				p.opt.Logger.Errorf("unaryProcessor.processUnaryRPC: generic invoke with request %s unmarshal error = %s", string(readBuf), err.Error())
 				return nil, *common.NewErrorWithAttachment(status.Errorf(codes.Internal, "generic invoke with request %s unmarshal error = %s", string(readBuf), err.Error()), responseAttachment)
 			}
-			p.opt.Logger.Debugf("generic invoke service with header %+v and args %+v", header, args)
+			p.opt.Logger.Debugf("unaryProcessor.processUnaryRPC: generic invoke service with header %+v and args %v", header, args)
 			reply, err = unaryService.InvokeWithArgs(header.FieldToCtx(), methodName, args)
 		} else {
 			reqParam, ok := unaryService.GetReqParamsInterfaces(methodName)
 			if !ok {
-				p.opt.Logger.Errorf("method name %s is not provided by service, please check if correct", methodName)
+				p.opt.Logger.Errorf("unaryProcessor.processUnaryRPC: method name %s is not provided by service, please check if correct", methodName)
 				return nil, *common.NewErrorWithAttachment(status.Errorf(codes.Unimplemented, "method name %s is not provided by service, please check if correct", methodName), responseAttachment)
 			}
 			// get args from buf
 			if err = p.twoWayCodec.UnmarshalRequest(readBuf, reqParam); err != nil {
-				p.opt.Logger.Errorf("Unary rpc request unmarshal error: %s", err)
+				p.opt.Logger.Errorf("unaryProcessor.processUnaryRPC: Unary rpc request unmarshal error: %s", err)
 				return nil, *common.NewErrorWithAttachment(status.Errorf(codes.Internal, "Unary rpc request unmarshal error: %s", err), responseAttachment)
 			}
 			args := make([]interface{}, 0, len(reqParam))
@@ -166,7 +167,7 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 				args = append(args, tempParamObj)
 			}
 			// invoke the service
-			p.opt.Logger.Debugf("unary invoke service method %s with header %+v and args %+v", methodName, header, args)
+			p.opt.Logger.Debugf("unaryProcessor.processUnaryRPC: unary invoke service method %s with header %+v and args %+v", methodName, header, args)
 			reply, err = unaryService.InvokeWithArgs(header.FieldToCtx(), methodName, args)
 		}
 	}
@@ -179,18 +180,23 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 	if result, ok := reply.(common.OuterResult); ok {
 		// proceess header trailer
 		outerAttachment := result.Attachments()
+		p.opt.Logger.Debugf("unaryProcessor.processUnaryRPC: get outerAttachment = %+v", outerAttachment)
 		for k, v := range outerAttachment {
 			if str, ok := v.(string); ok {
 				responseAttachment[k] = str
 			}
 		}
+		p.opt.Logger.Debugf("unaryProcessor.processUnaryRPC: get triple attachment = %+v", responseAttachment)
 		rawReplyStruct = result.Result()
+		p.opt.Logger.Debugf("unaryProcessor.processUnaryRPC: get reply %+v to be marshal", rawReplyStruct)
 	} else {
+		p.opt.Logger.Debug("unaryProcessor.processUnaryRPC: DEPRECATED! reply from service not impl common.OuterResult")
 		rawReplyStruct = reply
 	}
+	p.opt.Logger.Debugf("get result rawReplyStruct = %+v", rawReplyStruct)
 	replyData, err := p.twoWayCodec.MarshalResponse(rawReplyStruct)
 	if err != nil {
-		p.opt.Logger.Errorf("Unary rpc reply marshal error: %s", err)
+		p.opt.Logger.Errorf("unaryProcessor.processUnaryRPC: Unary rpc reply marshal error: %s", err)
 		return nil, *common.NewErrorWithAttachment(status.Errorf(codes.Internal, "Unary rpc reply marshal error: %s", err), responseAttachment)
 	}
 
@@ -206,25 +212,25 @@ func (p *unaryProcessor) runRPC(ctx context.Context) error {
 			return
 		case <-p.done:
 			// in this case, server doesn't receive data but got close signal, it returns canceled code
-			p.opt.Logger.Warn("unaryProcessor closed by force")
+			p.opt.Logger.Warn("unaryProcessor:runRPC: unaryProcessor closed by force")
 			p.handleRPCErr(status.Errorf(codes.Canceled, "processor has been canceled!"))
 			return
 		case recvMsg := <-recvChan:
 			// in this case, server unary processor have the chance to do process and return result
 			defer func() {
 				if e := recover(); e != nil {
-					p.opt.Logger.Errorf("when running unary process, cache error = %v", e)
+					p.opt.Logger.Errorf("unaryProcessor:runRPC: when running unary process, cache error = %v", e)
 					p.handleRPCErr(errors.New(fmt.Sprintf("%v", e)))
 				}
 			}()
 			if recvMsg.Err != nil {
-				p.opt.Logger.Errorf("unary processor receive message from http2 error = %s", recvMsg.Err)
+				p.opt.Logger.Errorf("unaryProcessor:runRPC: unary processor receive message from http2 error = %s", recvMsg.Err)
 				p.handleRPCErr(status.Errorf(codes.Internal, "unary processor receive message from http2 error = %s", recvMsg.Err))
 				return
 			}
 			rspData, errWithAttachment := p.processUnaryRPC(*recvMsg.Buffer, p.stream.getService(), p.stream.getHeader())
 			if err := errWithAttachment.GetError(); err != nil {
-				p.opt.Logger.Errorf("process unary rpc with header = %+v, data = %s,  error = %s", p.stream.getHeader(), recvMsg.Buffer.String(), err)
+				p.opt.Logger.Errorf("unaryProcessor:runRPC: process unary rpc with header = %+v, data = %s,  error = %s", p.stream.getHeader(), recvMsg.Buffer.String(), err)
 				p.handleRPCErr(err)
 				return
 			}
@@ -236,7 +242,7 @@ func (p *unaryProcessor) runRPC(ctx context.Context) error {
 			return
 		}
 	}); perr != nil {
-		p.opt.Logger.Warnf("go routine pool full with error = %v", perr)
+		p.opt.Logger.Warnf("unaryProcessor:runRPC: go routine pool full with error = %v", perr)
 		return status.Errorf(codes.ResourceExhausted, "go routine pool full with error = %v", perr)
 	}
 	return nil
@@ -270,7 +276,7 @@ func (sp *streamingProcessor) runRPC(ctx context.Context) error {
 
 	if perr := sp.pool.Submit(func() {
 		if err := sp.streamDesc.Handler(sp.stream.getService(), serverUserStream); err != nil {
-			sp.opt.Logger.Errorf("stream processor handle streaming request with service %+v with error = %s", sp.stream.getService(), err)
+			sp.opt.Logger.Errorf("streamingProcessor.runRPC: stream processor handle streaming request with service %+v with error = %s", sp.stream.getService(), err)
 			sp.handleRPCErr(status.Errorf(codes.Internal, "stream processor handle streaming request with service %+v with error = %s", sp.stream.getService(), err))
 			return
 		}
@@ -278,7 +284,7 @@ func (sp *streamingProcessor) runRPC(ctx context.Context) error {
 		// but unary rpc not, unary rpc processor only send data to stream layer
 		sp.handleRPCSuccess(nil, nil)
 	}); perr != nil {
-		sp.opt.Logger.Warnf("go routine pool full with error = %v", perr)
+		sp.opt.Logger.Warnf("streamingProcessor.runRPC: go routine pool full with error = %v", perr)
 		return status.Errorf(codes.ResourceExhausted, "go routine pool full with error = %v", perr)
 	}
 	return nil
