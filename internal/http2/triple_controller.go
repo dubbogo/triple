@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -429,7 +430,7 @@ func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, r
 		if len(v) == 0 {
 			continue
 		}
-		switch k {
+		switch strings.ToLower(k) {
 		case constant.TrailerKeyGrpcStatus:
 			code, err = strconv.Atoi(v[0])
 			if err != nil {
@@ -437,9 +438,19 @@ func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, r
 				return *common.NewErrorWithAttachment(perrors.Errorf("TripleController.UnaryInvoke: get trailer err = %v", err), attachment)
 			}
 		case constant.TrailerKeyGrpcMessage:
-			msg = rspTrailerHeader.Get(v[0])
+			msg = v[0]
 		default:
-			attachment[k] = v[0]
+			attachment[strings.ToLower(k)] = v[0]
+		}
+	}
+
+	if msg == "" && len(attachment) > 0 {
+		if attachment[constant.TrailerKeyGrpcDetailsBin] != "" {
+			trailerKeyGrpcDetailsBin := attachment[constant.TrailerKeyGrpcDetailsBin]
+			trailerKeyGrpcDetails, _ := base64.RawStdEncoding.DecodeString(trailerKeyGrpcDetailsBin)
+			if trailerKeyGrpcDetailsBin != "" {
+				msg = string(trailerKeyGrpcDetails)
+			}
 		}
 	}
 
