@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"reflect"
 	"sync"
 )
@@ -68,7 +69,20 @@ func (p *baseProcessor) handleRPCErr(err error) {
 	if !ok {
 		err = status.Errorf(codes.Unknown, err.Error())
 		appStatus, _ = status.FromError(err)
+
+		var errInfo = &spb.Status{
+			Message: fmt.Sprintf("%+v", err),
+		}
+		appStatus, err = appStatus.WithDetails(errInfo)
+
+		if err != nil {
+			// If this errored, it will always error
+			// here, so better panic so we can figure
+			// out why than have this silently passing.
+			panic(fmt.Sprintf("Unexpected error attaching metadata: %v", err))
+		}
 	}
+
 	p.stream.WriteCloseMsgTypeWithStatus(appStatus)
 }
 

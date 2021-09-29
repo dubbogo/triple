@@ -444,18 +444,20 @@ func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, r
 		}
 	}
 
-	if msg == "" && len(attachment) > 0 {
-		if attachment[constant.TrailerKeyGrpcDetailsBin] != "" {
-			trailerKeyGrpcDetailsBin := attachment[constant.TrailerKeyGrpcDetailsBin]
-			trailerKeyGrpcDetails, _ := base64.RawStdEncoding.DecodeString(trailerKeyGrpcDetailsBin)
-			if trailerKeyGrpcDetailsBin != "" {
-				msg = string(trailerKeyGrpcDetails)
-			}
-		}
-	}
-
 	if codes.Code(code) != codes.OK {
 		hc.option.Logger.Errorf("TripleController.UnaryInvoke: triple status not success, msg = %s, code = %d", msg, code)
+
+		if len(attachment) > 0 {
+			if attachment[constant.TrailerKeyGrpcDetailsBin] != "" {
+				trailerKeyGrpcDetailsBin := attachment[constant.TrailerKeyGrpcDetailsBin]
+				trailerKeyGrpcDetails, _ := base64.RawStdEncoding.DecodeString(trailerKeyGrpcDetailsBin)
+				if trailerKeyGrpcDetailsBin != "" {
+					details := string(trailerKeyGrpcDetails)
+					return *common.NewErrorWithAttachment(perrors.Errorf("TripleController.UnaryInvoke: triple status not success, msg = %s, code = %d,grpc-status-details-bin = %+v", msg, code, details), attachment)
+				}
+			}
+		}
+
 		return *common.NewErrorWithAttachment(perrors.Errorf("TripleController.UnaryInvoke: triple status not success, msg = %s, code = %d", msg, code), attachment)
 	}
 
