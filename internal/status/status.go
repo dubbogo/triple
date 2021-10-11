@@ -26,6 +26,9 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 
+	perrors "github.com/pkg/errors"
+
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 )
 
@@ -33,46 +36,63 @@ import (
 	"github.com/dubbogo/triple/internal/codes"
 )
 
+// TripleError wraps a pointer of a status proto. It implements error and Status,
+// and a nil *Error should never be returned by this package.
+type TripleError struct {
+	e *Status
+}
+
+func (e *TripleError) Error() string {
+	return fmt.Sprintf("rpc error: codes = %+v desc = %v", codes.Code(e.e.s.GetCode()), e.e.s.GetMessage())
+}
+
+func (e *TripleError) Status() *Status {
+	return e.e
+}
+func IsTripleError(err error) bool {
+	_, ok := err.(*TripleError)
+	return ok
+}
+
+// Errorf returns New Error with stackTraces from now
+func Errorf(c codes.Code, format string, a ...interface{}) *TripleError {
+	// create trace
+	newErrorf := perrors.Errorf(format, a...)
+	return FromError(c, newErrorf)
+}
+
+// FromError deal with user level error, which have recorded user codes' trace detail
+func FromError(code codes.Code, err error) *TripleError {
+	newStatus := NewStatus(code, err.Error())
+	newStatusWithDetail, err := newStatus.WithDetails(&errdetails.DebugInfo{
+		StackEntries: []string{
+			fmt.Sprintf("%+v", err),
+		},
+	})
+	if err != nil {
+		return &TripleError{
+			e: newStatus,
+		}
+	}
+	return &TripleError{
+		e: newStatusWithDetail,
+	}
+}
+
 // Status represents an RPC status codes, message, and details.  It is immutable
 // and should be created with New, Newf, or FromProto.
 type Status struct {
 	s *spb.Status
 }
 
-// nolint
-func FromError(err error) (s *Status, ok bool) {
-	if err == nil {
-		return nil, true
-	}
-	if se, ok := err.(*Error); ok {
-		return &Status{s: se.e}, true
-	}
-	return New(codes.Unknown, err.Error()), false
-}
-
-// New returns a Status representing c and msg.
-func New(c codes.Code, msg string) *Status {
+// NewStatus returns a Status representing c and msg.
+func NewStatus(c codes.Code, msg string) *Status {
 	return &Status{s: &spb.Status{Code: int32(c), Message: msg}}
-}
-
-// Newf returns New(c, fmt.Sprintf(format, a...)).
-func Newf(c codes.Code, format string, a ...interface{}) *Status {
-	return New(c, fmt.Sprintf(format, a...))
 }
 
 // FromProto returns a Status representing s.
 func FromProto(s *spb.Status) *Status {
 	return &Status{s: proto.Clone(s).(*spb.Status)}
-}
-
-// Err returns an error representing c and msg.  If c is OK, returns nil.
-func Err(c codes.Code, msg string) error {
-	return New(c, msg).Err()
-}
-
-// Errorf returns Error(c, fmt.Sprintf(format, a...)).
-func Errorf(c codes.Code, format string, a ...interface{}) error {
-	return Err(c, fmt.Sprintf(format, a...))
 }
 
 // Code returns the status codes contained in s.
@@ -97,14 +117,6 @@ func (s *Status) Proto() *spb.Status {
 		return nil
 	}
 	return proto.Clone(s.s).(*spb.Status)
-}
-
-// Err returns an immutable error representing s; returns nil if s.Code() is OK.
-func (s *Status) Err() error {
-	if s.Code() == codes.OK {
-		return nil
-	}
-	return &Error{e: s.Proto()}
 }
 
 // WithDetails returns a new status with the provided details messages appended to the status.
@@ -141,24 +153,4 @@ func (s *Status) Details() []interface{} {
 		details = append(details, detail.Message)
 	}
 	return details
-}
-
-// Error wraps a pointer of a status proto. It implements error and Status,
-// and a nil *Error should never be returned by this package.
-type Error struct {
-	e *spb.Status
-}
-
-func (e *Error) Error() string {
-	return fmt.Sprintf("rpc error: codes = %+v desc = %v", codes.Code(e.e.GetCode()), e.e.GetMessage())
-}
-
-// Is implements future error.Is functionality.
-// A Error is equivalent if the codes and message are identical.
-func (e *Error) Is(target error) bool {
-	tse, ok := target.(*Error)
-	if !ok {
-		return false
-	}
-	return proto.Equal(e.e, tse.e)
 }

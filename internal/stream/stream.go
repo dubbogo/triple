@@ -27,12 +27,11 @@ import (
 
 	h2Triple "github.com/dubbogo/net/http2/triple"
 
-	perrors "github.com/pkg/errors"
-
 	"google.golang.org/grpc"
 )
 
 import (
+	"github.com/dubbogo/triple/internal/codes"
 	"github.com/dubbogo/triple/internal/message"
 	"github.com/dubbogo/triple/internal/status"
 	"github.com/dubbogo/triple/pkg/common"
@@ -169,7 +168,7 @@ func (ss *serverStream) Close() {
 
 // NewServerStreamForNonPB creates a new server stream for non-protobuf, i.e. hessian.
 func NewServerStreamForNonPB(ctx context.Context, header h2Triple.ProtocolHeader, opt *config.Option, pool gxsync.WorkerPool,
-	service common.TripleUnaryService, serializer common.TwoWayCodec, genericCodec common.GenericCodec) (*serverStream, error) {
+	service common.TripleUnaryService, serializer common.TwoWayCodec, genericCodec common.GenericCodec) (*serverStream, *status.TripleError) {
 	baseStream := newBaseStream(service)
 
 	serverStream := &serverStream{
@@ -182,7 +181,7 @@ func NewServerStreamForNonPB(ctx context.Context, header h2Triple.ProtocolHeader
 
 // NewServerStreamForPB creates a new server stream for protobuf.
 func NewServerStreamForPB(ctx context.Context, header h2Triple.ProtocolHeader, desc interface{}, opt *config.Option, pool gxsync.WorkerPool,
-	service interface{}, serializer common.TwoWayCodec) (*serverStream, error) {
+	service interface{}, serializer common.TwoWayCodec) (*serverStream, *status.TripleError) {
 	baseStream := newBaseStream(service)
 
 	serverStream := &serverStream{
@@ -198,7 +197,7 @@ func NewServerStreamForPB(ctx context.Context, header h2Triple.ProtocolHeader, d
 		serverStream.processor = newStreamingProcessor(serverStream, streamDesc, serializer, pool, opt)
 	} else {
 		opt.Logger.Error("grpc desc invalid:", desc)
-		return nil, perrors.Errorf("grpc desc invalid: %v", desc)
+		return nil, status.Errorf(codes.Unimplemented, "grpc desc invalid: %v", desc)
 	}
 	return serverStream, serverStream.processor.runRPC(ctx)
 }
