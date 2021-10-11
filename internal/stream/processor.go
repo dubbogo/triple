@@ -232,7 +232,7 @@ func (p *unaryProcessor) runRPC(ctx context.Context) *status.TripleError {
 			}
 			rspData, errWithAttachment := p.processUnaryRPC(*recvMsg.Buffer, p.stream.getService(), p.stream.getHeader())
 			if err := errWithAttachment.GetError(); err != nil {
-				p.opt.Logger.Errorf("unaryProcessor:runRPC: process unary rpc with header = %+v, data = %s,  error = %s", p.stream.getHeader(), recvMsg.Buffer.String(), err)
+				p.opt.Logger.Errorf("unaryProcessor:runRPC: process unary rpc with: header = %+v\ndata = %s\n error = %s", p.stream.getHeader(), recvMsg.Buffer.String(), err)
 				p.handleRPCErr(err)
 				return
 			}

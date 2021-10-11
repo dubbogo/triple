@@ -43,27 +43,27 @@ func NewLoggerWrapper(logger Logger) *LoggerWrapper {
 }
 
 func (w *LoggerWrapper) Info(args ...interface{}) {
-	w.logger.Info(args)
+	w.logger.Info(args...)
 }
 func (w *LoggerWrapper) Warn(args ...interface{}) {
-	w.logger.Warn(args)
+	w.logger.Warn(args...)
 }
 func (w *LoggerWrapper) Error(args ...interface{}) {
-	w.logger.Error(args)
+	w.logger.Error(args...)
 }
 func (w *LoggerWrapper) Debug(args ...interface{}) {
-	w.logger.Debug(args)
+	w.logger.Debug(args...)
 }
 
 func (w *LoggerWrapper) Infof(fmt string, args ...interface{}) {
-	w.logger.Infof(fmt, args)
+	w.logger.Infof(fmt, args...)
 }
 func (w *LoggerWrapper) Warnf(fmt string, args ...interface{}) {
-	w.logger.Warnf(fmt, args)
+	w.logger.Warnf(fmt, args...)
 }
 func (w *LoggerWrapper) Errorf(fmt string, args ...interface{}) {
-	w.logger.Errorf(fmt, args)
+	w.logger.Errorf(fmt, args...)
 }
 func (w *LoggerWrapper) Debugf(fmt string, args ...interface{}) {
-	w.logger.Debugf(fmt, args)
+	w.logger.Debugf(fmt, args...)
 }

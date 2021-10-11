@@ -186,7 +186,7 @@ func (hc *TripleController) GetHandler(rpcService interface{}) http2.Handler {
 
 func (hc *TripleController) handleStatusAttachmentAndResponse(tripleStatus *status.Status, attachment map[string]string, ctrlch chan http.Header) {
 	// second response header with trailer fields
-	hc.option.Logger.Debugf("TripleController.handleStatusAttachmentAndResponse: with response tripleStatus = %+v,"+
+	hc.option.Logger.Debugf("TripleController.handleStatusAttachmentAndResponse: with response \ntripleStatus = %+v\n"+
 		"attachment = %+v", tripleStatus.Proto(), attachment)
 	rspTrialer := make(map[string][]string)
 	rspTrialer[constant.TrailerKeyGrpcStatus] = []string{strconv.Itoa(int(tripleStatus.Code()))} //[]string{strconv.Itoa(int(tripleStatus.Code()))}
