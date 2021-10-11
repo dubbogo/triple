@@ -40,7 +40,7 @@ import (
 	tripleConstant "github.com/dubbogo/triple/pkg/common/constant"
 )
 
-var greeterProvider = new(proto.GreeterClientImpl)
+var greeterProvider = &proto.GreeterClientImpl{}
 
 func init() {
 	config.SetConsumerService(greeterProvider)
@@ -55,11 +55,26 @@ func main() {
 	time.Sleep(time.Second * 3)
 	testSayHello()
 
+	//testSayHelloWithError()
+
 	// stream is not available for dubbo-java
 	//testSayHelloStream()
 
 	// high parallel and gr pool limitaion
 	//testSayHelloWithHighParallel()
+}
+
+func testSayHelloWithError() {
+	logger.Infof("testSayHello")
+
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, tripleConstant.TripleCtxKey(tripleConstant.TripleRequestID), "triple-request-id-demo")
+
+	req := proto.HelloRequest{
+		Name: "laurence",
+	}
+	user, err := greeterProvider.SayHelloWithError(ctx, &req)
+	logger.Infof("GetResponse error = %+v, rspUser = %+v", err, user)
 }
 
 func testSayHello() {

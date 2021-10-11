@@ -45,7 +45,7 @@ func AddDefaultOption(opt *config.Option) *config.Option {
 }
 
 // GetServiceKeyAndUpperCaseMethodNameFromPath todo call this function time, once to save time
-func GetServiceKeyAndUpperCaseMethodNameFromPath(path string) (string, string, error) {
+func GetServiceKeyAndUpperCaseMethodNameFromPath(path string) (string, string, *status.TripleError) {
 	paramList := strings.Split(path, "/")
 	if len(paramList) < 3 {
 		return "", "", status.Errorf(codes.Internal, "invalid triple header path = %s", path)

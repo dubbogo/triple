@@ -20,9 +20,7 @@ package stream
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
-	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"reflect"
 	"sync"
 )
@@ -48,7 +46,7 @@ import (
 // processor is the interface, with func runRPC and close
 // It processes server RPC method that user defined and get response
 type processor interface {
-	runRPC(ctx context.Context) error
+	runRPC(ctx context.Context) *status.TripleError
 	close()
 }
 
@@ -65,31 +63,17 @@ type baseProcessor struct {
 
 // handleRPCErr writes close message with status of given @err
 func (p *baseProcessor) handleRPCErr(err error) {
-	appStatus, ok := status.FromError(err)
-	if !ok {
-		err = status.Errorf(codes.Unknown, err.Error())
-		appStatus, _ = status.FromError(err)
-
-		var errInfo = &spb.Status{
-			Message: fmt.Sprintf("%+v", err),
-		}
-		appStatus, err = appStatus.WithDetails(errInfo)
-
-		if err != nil {
-			// If this errored, it will always error
-			// here, so better panic so we can figure
-			// out why than have this silently passing.
-			panic(fmt.Sprintf("Unexpected error attaching metadata: %v", err))
-		}
+	if status.IsTripleError(err) {
+		p.stream.WriteCloseMsgTypeWithStatus(err.(*status.TripleError).Status())
+		return
 	}
-
-	p.stream.WriteCloseMsgTypeWithStatus(appStatus)
+	p.stream.WriteCloseMsgTypeWithStatus(status.FromError(codes.Unknown, err).Status())
 }
 
 // handleRPCSuccess sends data and grpc success code with message
 func (p *baseProcessor) handleRPCSuccess(data []byte, attachment map[string]string) {
 	p.stream.PutSend(data, attachment, message.DataMsgType)
-	p.stream.WriteCloseMsgTypeWithStatus(status.New(codes.OK, ""))
+	p.stream.WriteCloseMsgTypeWithStatus(status.NewStatus(codes.OK, ""))
 }
 
 // close closes processor once
@@ -186,11 +170,6 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 		}
 	}
 
-	if err != nil {
-		p.opt.Logger.Errorf("Unary rpc process error: %s, the error may be returned by user", err)
-		return nil, *common.NewErrorWithAttachment(status.Errorf(codes.Internal, "Unary rpc process error: %s,  the error may be returned by user", err), responseAttachment)
-	}
-
 	if result, ok := reply.(common.OuterResult); ok {
 		// proceess header trailer
 		outerAttachment := result.Attachments()
@@ -207,18 +186,27 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service interface{}, 
 		p.opt.Logger.Debug("unaryProcessor.processUnaryRPC: DEPRECATED! reply from service not impl common.OuterResult")
 		rawReplyStruct = reply
 	}
-	p.opt.Logger.Debugf("get result rawReplyStruct = %+v", rawReplyStruct)
-	replyData, err := p.twoWayCodec.MarshalResponse(rawReplyStruct)
+
+	var replyData []byte
+	if rawReplyStruct != nil {
+		p.opt.Logger.Debugf("get result rawReplyStruct = %+v", rawReplyStruct)
+		var marshalErr error
+		replyData, marshalErr = p.twoWayCodec.MarshalResponse(rawReplyStruct)
+		if marshalErr != nil {
+			p.opt.Logger.Errorf("unaryProcessor.processUnaryRPC: Unary rpc reply marshal error: %s", marshalErr)
+			return nil, *common.NewErrorWithAttachment(status.Errorf(codes.Internal, "Unary rpc reply marshal error: %s", marshalErr), responseAttachment)
+		}
+	}
+
 	if err != nil {
-		p.opt.Logger.Errorf("unaryProcessor.processUnaryRPC: Unary rpc reply marshal error: %s", err)
-		return nil, *common.NewErrorWithAttachment(status.Errorf(codes.Internal, "Unary rpc reply marshal error: %s", err), responseAttachment)
+		return replyData, *common.NewErrorWithAttachment(status.FromError(codes.Unknown, err), responseAttachment)
 	}
 
 	return replyData, *common.NewErrorWithAttachment(nil, responseAttachment)
 }
 
 // runRPC is called by lower layer's stream
-func (p *unaryProcessor) runRPC(ctx context.Context) error {
+func (p *unaryProcessor) runRPC(ctx context.Context) *status.TripleError {
 	recvChan := p.stream.GetRecv()
 	if perr := p.pool.Submit(func() {
 		select {
@@ -234,7 +222,7 @@ func (p *unaryProcessor) runRPC(ctx context.Context) error {
 			defer func() {
 				if e := recover(); e != nil {
 					p.opt.Logger.Errorf("unaryProcessor:runRPC: when running unary process, cache error = %v", e)
-					p.handleRPCErr(errors.New(fmt.Sprintf("%v", e)))
+					p.handleRPCErr(status.Errorf(codes.Internal, fmt.Sprintf("%v", e)))
 				}
 			}()
 			if recvMsg.Err != nil {
@@ -285,7 +273,7 @@ func newStreamingProcessor(s *serverStream, desc grpc.StreamDesc, serializer com
 }
 
 // runRPC called by stream
-func (sp *streamingProcessor) runRPC(ctx context.Context) error {
+func (sp *streamingProcessor) runRPC(ctx context.Context) *status.TripleError {
 	serverUserStream := newServerUserStream(sp.stream, sp.twoWayCodec, sp.opt)
 
 	if perr := sp.pool.Submit(func() {

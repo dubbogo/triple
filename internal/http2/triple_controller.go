@@ -36,6 +36,8 @@ import (
 
 	perrors "github.com/pkg/errors"
 
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
+
 	"google.golang.org/grpc"
 )
 
@@ -112,7 +114,7 @@ func (hc *TripleController) GetHandler(rpcService interface{}) http2.Handler {
 			st, err := hc.newServerStreamFromTripleHeader(ctx, path, header, rpcService, hc.pool)
 			if st == nil || err != nil {
 				hc.option.Logger.Errorf("TripleController.http2HandlerFunction: creat server stream error = %s\n", err)
-				tripleStatus, _ = status.FromError(err)
+				tripleStatus = err.Status()
 				close(sendChan)
 				hc.handleStatusAttachmentAndResponse(tripleStatus, nil, ctrlch)
 				return
@@ -140,7 +142,7 @@ func (hc *TripleController) GetHandler(rpcService interface{}) http2.Handler {
 			if err := hc.pool.Submit(sendToStream); err != nil {
 				close(sendChan)
 				hc.option.Logger.Warnf("TripleController.http2HandlerFunction: go routine pool full with error = %v", err)
-				hc.handleStatusAttachmentAndResponse(status.New(codes.ResourceExhausted, fmt.Sprintf("go routine pool full with error = %v", err)), nil, ctrlch)
+				hc.handleStatusAttachmentAndResponse(status.NewStatus(codes.ResourceExhausted, fmt.Sprintf("go routine pool full with error = %v", err)), nil, ctrlch)
 				return
 			}
 
@@ -148,7 +150,7 @@ func (hc *TripleController) GetHandler(rpcService interface{}) http2.Handler {
 			for {
 				select {
 				case <-hc.closeChan:
-					tripleStatus = status.New(codes.Canceled, "triple server canceled by force")
+					tripleStatus = status.NewStatus(codes.Canceled, "triple server canceled by force")
 					// call finished by force
 					break Loop
 				case sendMsg := <-streamSendChan:
@@ -176,7 +178,7 @@ func (hc *TripleController) GetHandler(rpcService interface{}) http2.Handler {
 				ctrlch <- rspHeader
 				close(sendChan)
 				hc.option.Logger.Warnf("TripleController.http2HandlerFunction: failed to occupy worker goroutine, go routine pool full with error = %v", err)
-				hc.handleStatusAttachmentAndResponse(status.New(codes.ResourceExhausted, fmt.Sprintf("go routine pool full with error = %v", err)), nil, ctrlch)
+				hc.handleStatusAttachmentAndResponse(status.NewStatus(codes.ResourceExhausted, fmt.Sprintf("go routine pool full with error = %v", err)), nil, ctrlch)
 			}()
 		}
 	}
@@ -211,7 +213,7 @@ func (hc *TripleController) handleStatusAttachmentAndResponse(tripleStatus *stat
 }
 
 // getMethodAndStreamDescMap get unary method desc map and stream method desc map from dubbo3 stub
-func getMethodAndStreamDescMap(ds common.TripleGrpcService) (map[string]grpc.MethodDesc, map[string]grpc.StreamDesc, error) {
+func getMethodAndStreamDescMap(ds common.TripleGrpcService) (map[string]grpc.MethodDesc, map[string]grpc.StreamDesc) {
 	sdMap := make(map[string]grpc.MethodDesc, len(ds.ServiceDesc().Methods))
 	strMap := make(map[string]grpc.StreamDesc, len(ds.ServiceDesc().Streams))
 	for _, v := range ds.ServiceDesc().Methods {
@@ -220,7 +222,7 @@ func getMethodAndStreamDescMap(ds common.TripleGrpcService) (map[string]grpc.Met
 	for _, v := range ds.ServiceDesc().Streams {
 		strMap[v.StreamName] = v
 	}
-	return sdMap, strMap, nil
+	return sdMap, strMap
 }
 
 // NewTripleController can create TripleController with impl @rpcServiceMap and url
@@ -268,7 +270,7 @@ any error occurs in the above procedures are fatal, as the invocation target can
 todo how to deal with error in this procedure gracefully is to be discussed next
 */
 func (hc *TripleController) newServerStreamFromTripleHeader(ctx context.Context, path string, header http.Header,
-	rpcService interface{}, pool gxsync.WorkerPool) (stream.Stream, error) {
+	rpcService interface{}, pool gxsync.WorkerPool) (stream.Stream, *status.TripleError) {
 	interfaceKey, methodName, err := tools.GetServiceKeyAndUpperCaseMethodNameFromPath(path)
 	if err != nil {
 		return nil, err
@@ -285,15 +287,11 @@ func (hc *TripleController) newServerStreamFromTripleHeader(ctx context.Context,
 		service, ok := rpcService.(common.TripleGrpcService)
 		if !ok {
 			hc.option.Logger.Errorf("TripleController.newServerStreamFromTripleHeader: can't assert impl of interface %s to TripleGrpcService", interfaceKey)
-			return nil, status.Err(codes.Internal, "can't assert impl of interface "+interfaceKey+" to TripleGrpcService")
+			return nil, status.Errorf(codes.Internal, "can't assert impl of interface "+interfaceKey+" to TripleGrpcService")
 		}
 		// pb twoWayCodec needs grpc.Desc to do method discovery, allowing unary and streaming invocation
 		// todo the maps can be cached to save time
-		methodMap, streamMap, err := getMethodAndStreamDescMap(service)
-		if err != nil {
-			hc.option.Logger.Errorf("TripleController.newServerStreamFromTripleHeader: new H2 controller error: %s", err)
-			return nil, status.Err(codes.Unimplemented, err.Error())
-		}
+		methodMap, streamMap := getMethodAndStreamDescMap(service)
 		unaryRPCDiscovery, unaryOk := methodMap[methodName]
 		streamRPCDiscovery, streamOk := streamMap[methodName]
 
@@ -325,7 +323,7 @@ func (hc *TripleController) newServerStreamFromTripleHeader(ctx context.Context,
 			return nil, status.Errorf(codes.Internal, "can't assert impl of interface %s service %+v to TripleUnaryService", interfaceKey, rpcService)
 		}
 		// unary service doesn't need to use grpc.Desc, and now only support unary invocation
-		var err error
+		var err *status.TripleError
 		newStream, err = stream.NewServerStreamForNonPB(ctx, triHeader, hc.option, pool, service, hc.twoWayCodec, hc.genericCodec)
 		if err != nil {
 			hc.option.Logger.Errorf("TripleController.newServerStreamFromTripleHeader: unary service new server stream error = %v", err)
@@ -452,8 +450,15 @@ func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, r
 				trailerKeyGrpcDetailsBin := attachment[constant.TrailerKeyGrpcDetailsBin]
 				trailerKeyGrpcDetails, _ := base64.RawStdEncoding.DecodeString(trailerKeyGrpcDetailsBin)
 				if trailerKeyGrpcDetailsBin != "" {
-					details := string(trailerKeyGrpcDetails)
-					return *common.NewErrorWithAttachment(perrors.Errorf("TripleController.UnaryInvoke: triple status not success, msg = %s, code = %d,grpc-status-details-bin = %+v", msg, code, details), attachment)
+					//details := &spb.Status{}
+					details, _ := status.NewStatus(codes.Internal, "").WithDetails(&errdetails.DebugInfo{})
+					detailProto := details.Proto()
+					if err := proto.Unmarshal(trailerKeyGrpcDetails, detailProto); err == nil && len(detailProto.Details) > 0 {
+						stackTracesStr := strings.Replace(detailProto.Details[0].String(), `\n`, "\n", -1)
+						stackTracesStr = strings.Replace(stackTracesStr, `\t`, "\t", -1)
+						return *common.NewErrorWithAttachment(perrors.Errorf("TripleController.UnaryInvoke: triple status not success, msg = %s,\n code = %d,\n error from server stacks are %s\n", msg, code, stackTracesStr), attachment)
+					}
+					return *common.NewErrorWithAttachment(perrors.Errorf("TripleController.UnaryInvoke: triple status not success, msg = %s, code = %d, error stacks not found", msg, code), attachment)
 				}
 			}
 		}

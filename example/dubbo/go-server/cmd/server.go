@@ -33,6 +33,8 @@ import (
 	"dubbo.apache.org/dubbo-go/v3/common/logger"
 	"dubbo.apache.org/dubbo-go/v3/config"
 	_ "dubbo.apache.org/dubbo-go/v3/imports"
+
+	perrors "github.com/pkg/errors"
 )
 
 import (
@@ -114,4 +116,13 @@ func (s *GreeterProvider) SayHello(ctx context.Context, in *proto.HelloRequest) 
 	time.Sleep(time.Second * 1)
 	fmt.Println("get triple header tri-service-version = ", ctx.Value(tripleConstant.TripleCtxKey(tripleConstant.TripleServiceVersion)))
 	return &proto.User{Name: in.Name, Id: "12345", Age: 21}, nil
+}
+
+func (s *GreeterProvider) SayHelloWithError(ctx context.Context, in *proto.HelloRequest) (*proto.User, error) {
+	logger.Infof("Dubbo3 GreeterProvider get user name = %s\n" + in.Name)
+	fmt.Println("get triple header tri-req-id = ", ctx.Value(tripleConstant.TripleCtxKey(tripleConstant.TripleRequestID)))
+	time.Sleep(time.Second * 1)
+	err := perrors.New("user defined error")
+	fmt.Println("get triple header tri-service-version = ", ctx.Value(tripleConstant.TripleCtxKey(tripleConstant.TripleServiceVersion)))
+	return &proto.User{Name: in.Name, Id: "12345", Age: 21}, err
 }
