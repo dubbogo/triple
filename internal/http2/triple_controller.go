@@ -443,8 +443,8 @@ func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, r
 	}
 
 	if codes.Code(code) != codes.OK {
-		hc.option.Logger.Errorf("TripleController.UnaryInvoke: triple status not success, msg = %s, code = %d", msg, code)
-
+		hc.option.Logger.Warnf("TripleController.UnaryInvoke: triple status not success, msg = %s, code = %d", msg, code)
+		var stackTracesStr string
 		if len(attachment) > 0 {
 			if attachment[constant.TrailerKeyGrpcDetailsBin] != "" {
 				trailerKeyGrpcDetailsBin := attachment[constant.TrailerKeyGrpcDetailsBin]
@@ -454,21 +454,20 @@ func (hc *TripleController) UnaryInvoke(ctx context.Context, path string, arg, r
 					details, _ := status.NewStatus(codes.Internal, "").WithDetails(&errdetails.DebugInfo{})
 					detailProto := details.Proto()
 					if err := proto.Unmarshal(trailerKeyGrpcDetails, detailProto); err == nil && len(detailProto.Details) > 0 {
-						stackTracesStr := strings.Replace(detailProto.Details[0].String(), `\n`, "\n", -1)
+						stackTracesStr = strings.Replace(detailProto.Details[0].String(), `\n`, "\n", -1)
 						stackTracesStr = strings.Replace(stackTracesStr, `\t`, "\t", -1)
-						return *common.NewErrorWithAttachment(perrors.Errorf("TripleController.UnaryInvoke: triple status not success, msg = %s,\n code = %d,\n error from server stacks are %s\n", msg, code, stackTracesStr), attachment)
 					}
-					return *common.NewErrorWithAttachment(perrors.Errorf("TripleController.UnaryInvoke: triple status not success, msg = %s, code = %d, error stacks not found", msg, code), attachment)
 				}
 			}
 		}
-
-		return *common.NewErrorWithAttachment(perrors.Errorf("TripleController.UnaryInvoke: triple status not success, msg = %s, code = %d", msg, code), attachment)
+		// Now only error returned by server side rpc function can user level error get attachment of triple
+		// that is because error is nil when rpc success, and user can't get attachment.
+		return *common.NewErrorWithAttachment(common.NewTripleError(msg, code, stackTracesStr, attachment), attachment)
 	}
 
 	// all split data are collected and to unmarshal
 	if err := hc.twoWayCodec.UnmarshalResponse(rspData, reply); err != nil {
-		hc.option.Logger.Errorf("client unmarshal rsp err= %v\n", err)
+		hc.option.Logger.Errorf("client unmarshal rsp err = %v\n", err)
 		return *common.NewErrorWithAttachment(err, attachment)
 	}
 	return *common.NewErrorWithAttachment(nil, attachment)

@@ -37,6 +37,7 @@ import (
 
 import (
 	"github.com/dubbogo/triple/example/dubbo/proto"
+	"github.com/dubbogo/triple/pkg/common"
 	tripleConstant "github.com/dubbogo/triple/pkg/common/constant"
 )
 
@@ -46,7 +47,7 @@ func init() {
 	config.SetConsumerService(greeterProvider)
 	runtime.SetMutexProfileFraction(1)
 }
-// need to setup environment variable "CONF_CONSUMER_FILE_PATH" to "conf/client.yml" before run
+// Set up DUBBO_GO_CONFIG_PATH to dubbogo.yml before run
 func main() {
 	go func() {
 		_ = http.ListenAndServe("0.0.0.0:6061", nil)
@@ -55,7 +56,7 @@ func main() {
 	time.Sleep(time.Second * 3)
 	testSayHello()
 
-	//testSayHelloWithError()
+	testSayHelloWithError()
 
 	// stream is not available for dubbo-java
 	//testSayHelloStream()
@@ -65,7 +66,7 @@ func main() {
 }
 
 func testSayHelloWithError() {
-	logger.Infof("testSayHello")
+	logger.Infof("testSayHelloWithError")
 
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, tripleConstant.TripleCtxKey(tripleConstant.TripleRequestID), "triple-request-id-demo")
@@ -74,7 +75,7 @@ func testSayHelloWithError() {
 		Name: "laurence",
 	}
 	user, err := greeterProvider.SayHelloWithError(ctx, &req)
-	logger.Infof("GetResponse error = %+v, rspUser = %+v", err, user)
+	logger.Infof("GetResponse error = %+v, rspUser = %+v", err.(*common.TripleError).StacksTrace(), user)
 }
 
 func testSayHello() {
