@@ -195,7 +195,7 @@ func skipHeader(frameData []byte) ([]byte, uint32) {
 func readSplitData(ctx context.Context, rBody io.ReadCloser) chan *bytes.Buffer {
 	cbm := make(chan *bytes.Buffer)
 	go func() {
-		buf := make([]byte, 4098) // todo configurable
+		buf := make([]byte, 4096) // todo configurable
 		for {
 			splitBuffer := bytes.NewBuffer(make([]byte, 0))
 
