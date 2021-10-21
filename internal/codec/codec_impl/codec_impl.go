@@ -155,7 +155,7 @@ func (h *GenericCodec) UnmarshalRequest(data []byte) ([]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	result := make([]interface{}, 0)
+	result := make([]interface{}, 0, len(wrapperRequest.Args))
 
 	for _, value := range wrapperRequest.Args {
 		decoder := hessian.NewDecoder(value)

@@ -61,9 +61,9 @@ func NewPBWrapperTwoWayCodec(codecName constant.CodecType) (common.TwoWayCodec, 
 
 // MarshalRequest marshal interface @v to []byte
 func (h *PBWrapperTwoWayCodec) MarshalRequest(v interface{}) ([]byte, error) {
-	argsBytes := make([][]byte, 0)
-	argsTypes := make([]string, 0)
 	reqList := v.([]interface{})
+	argsBytes := make([][]byte, 0, len(reqList))
+	argsTypes := make([]string, 0, len(reqList))
 	for _, value := range reqList {
 		data, err := h.codec.Marshal(value)
 		if err != nil {
