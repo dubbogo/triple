@@ -27,7 +27,7 @@ import (
 
 // TripleGrpcService is gRPC service, used to check impl
 type TripleGrpcService interface {
-	ServiceDesc() *grpc.ServiceDesc
+	XXX_ServiceDesc() *grpc.ServiceDesc
 }
 
 // TripleUnaryService is normal protocol service (except grpc service), should be implemented by users

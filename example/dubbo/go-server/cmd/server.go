@@ -88,7 +88,7 @@ func initSignal() {
 
 
 type GreeterProvider struct {
-	proto.GreeterProviderBase
+	proto.UnimplementedGreeterServer
 }
 
 func (s *GreeterProvider) SayHelloStream(svr proto.Greeter_SayHelloStreamServer) error {

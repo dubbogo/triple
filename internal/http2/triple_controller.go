@@ -214,12 +214,12 @@ func (hc *TripleController) handleStatusAttachmentAndResponse(tripleStatus *stat
 
 // getMethodAndStreamDescMap get unary method desc map and stream method desc map from dubbo3 stub
 func getMethodAndStreamDescMap(ds common.TripleGrpcService) (map[string]grpc.MethodDesc, map[string]grpc.StreamDesc) {
-	sdMap := make(map[string]grpc.MethodDesc, len(ds.ServiceDesc().Methods))
-	strMap := make(map[string]grpc.StreamDesc, len(ds.ServiceDesc().Streams))
-	for _, v := range ds.ServiceDesc().Methods {
+	sdMap := make(map[string]grpc.MethodDesc, len(ds.XXX_ServiceDesc().Methods))
+	strMap := make(map[string]grpc.StreamDesc, len(ds.XXX_ServiceDesc().Streams))
+	for _, v := range ds.XXX_ServiceDesc().Methods {
 		sdMap[v.MethodName] = v
 	}
-	for _, v := range ds.ServiceDesc().Streams {
+	for _, v := range ds.XXX_ServiceDesc().Streams {
 		strMap[v.StreamName] = v
 	}
 	return sdMap, strMap
