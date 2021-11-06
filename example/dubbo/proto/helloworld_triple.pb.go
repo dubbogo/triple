@@ -15,9 +15,9 @@ import (
 	common "github.com/dubbogo/triple/pkg/common"
 	constant "github.com/dubbogo/triple/pkg/common/constant"
 	triple "github.com/dubbogo/triple/pkg/triple"
-	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
+	grpc "github.com/dubbogo/triple/pkg/grpc"
+	codes "github.com/dubbogo/triple/pkg/grpc/codes"
+	status "github.com/dubbogo/triple/pkg/grpc/status"
 )
 
 // This is a compile-time assertion to ensure that this generated file

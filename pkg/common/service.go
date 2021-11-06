@@ -22,7 +22,7 @@ import (
 )
 
 import (
-	"google.golang.org/grpc"
+	"github.com/dubbogo/triple/pkg/grpc"
 )
 
 // TripleGrpcService is gRPC service, used to check impl

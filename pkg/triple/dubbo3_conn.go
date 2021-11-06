@@ -23,7 +23,7 @@ import (
 )
 
 import (
-	"google.golang.org/grpc"
+	"github.com/dubbogo/triple/pkg/grpc"
 )
 
 import (
@@ -33,26 +33,35 @@ import (
 // TripleConn is the struct that called in pb.go file
 // Its client field contains all net logic of dubbo3
 type TripleConn struct {
-	client *TripleClient
+	client   *TripleClient
+	grpcConn *grpc.ClientConn
 }
 
 // Invoke called by unary rpc 's pb.go file in dubbo-go 3.0 design
 // @method is /interfaceKey/functionName e.g. /com.apache.dubbo.sample.basic.IGreeter/BigUnaryTest
 // @arg is request body, must be proto.Message type
 func (t *TripleConn) Invoke(ctx context.Context, method string, args, reply interface{}, opts ...grpc.CallOption) common.ErrorWithAttachment {
-	return t.client.Request(ctx, method, args, reply)
+	//grpc.Combine()
+
+	//return t.client.Request(ctx, method, args, reply)
+	err := grpc.GRPCConnInvoke(ctx, method, args, reply, t.grpcConn, opts...)
+	return *common.NewErrorWithAttachment(err, nil)
 }
 
 // NewStream called when streaming rpc 's pb.go file
 // @method is /interfaceKey/functionName e.g. /com.apache.dubbo.sample.basic.IGreeter/BigStreamTest
 func (t *TripleConn) NewStream(ctx context.Context, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
-	return t.client.StreamRequest(ctx, method)
+	panic("stream is not support yet")
+	return nil, nil
 }
 
 // newTripleConn new a triple conn with given @tripleclient, which contains all net logic
-func newTripleConn(client *TripleClient) *TripleConn {
+func newTripleConn(address string, opts ...grpc.DialOption) *TripleConn {
+	//grpcConn, _ := grpc.Dial(address,grpc.WithInsecure())
+	opts = append(opts, grpc.WithInsecure())
+	grpcConn, _ := grpc.Dial(address, opts...)
 	return &TripleConn{
-		client: client,
+		grpcConn: grpcConn,
 	}
 }
 

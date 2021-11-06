@@ -19,19 +19,22 @@ package triple
 
 import (
 	"context"
+	"github.com/dubbogo/triple/pkg/grpc/codes"
+	"github.com/dubbogo/triple/pkg/grpc/encoding/tools"
+	"github.com/dubbogo/triple/pkg/grpc/status"
 	"reflect"
 	"sync"
 )
 
 import (
-	"google.golang.org/grpc"
+	"github.com/dubbogo/triple/pkg/grpc"
+	"github.com/dubbogo/triple/pkg/grpc/encoding"
+	"github.com/dubbogo/triple/pkg/grpc/encoding/hessian"
+	"github.com/dubbogo/triple/pkg/grpc/encoding/msgpack"
+	"github.com/dubbogo/triple/pkg/grpc/encoding/raw_proto"
 )
 
 import (
-	"github.com/dubbogo/triple/internal/codes"
-	"github.com/dubbogo/triple/internal/http2"
-	"github.com/dubbogo/triple/internal/status"
-	"github.com/dubbogo/triple/internal/tools"
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
 	"github.com/dubbogo/triple/pkg/config"
@@ -39,9 +42,9 @@ import (
 
 // TripleClient client endpoint that using triple protocol
 type TripleClient struct {
-	h2Controller *http2.TripleController
-
 	stubInvoker reflect.Value
+
+	triplConn *TripleConn
 
 	//once is used when destroy
 	once sync.Once
@@ -58,20 +61,26 @@ type TripleClient struct {
 // @impl must have method: GetDubboStub(cc *dubbo3.TripleConn) interface{}, to be capable with grpc
 // @opt is used to init http2 controller, if it's nil, use the default config
 func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error) {
-	opt = tools.AddDefaultOption(opt)
-	h2Controller, err := http2.NewTripleController(opt)
-	if err != nil {
-		opt.Logger.Errorf("NewTripleController err = %v", err)
-		return nil, err
-	}
 	tripleClient := &TripleClient{
-		opt:          opt,
-		h2Controller: h2Controller,
+		opt: opt,
 	}
 
-	// put dubbo3 network logic to tripleConn, creat pb stub invoker
 	if opt.CodecType == constant.PBCodecName {
-		tripleClient.stubInvoker = reflect.ValueOf(getInvoker(impl, newTripleConn(tripleClient)))
+		// put dubbo3 network logic to tripleConn, creat pb stub invoker
+		tripleClient.stubInvoker = reflect.ValueOf(getInvoker(impl, newTripleConn(opt.Location)))
+	} else {
+		var innerCodec encoding.Codec
+		switch opt.CodecType {
+		case constant.HessianCodecName:
+			innerCodec = hessian.NewHessianCodec()
+		case constant.MsgPackCodecName:
+			innerCodec = msgpack.NewMsgPackCodec()
+		default:
+			panic("unsupport codec = " + opt.CodecType)
+		}
+		tripleClient.triplConn = newTripleConn(opt.Location, grpc.WithDefaultCallOptions(grpc.ForceCodec(
+			encoding.NewPBWrapperTwoWayCodec(string(opt.CodecType), innerCodec, raw_proto.NewProtobufCodec()),
+		)))
 	}
 
 	return tripleClient, nil
@@ -115,31 +124,29 @@ func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply inter
 				reqParams = append(reqParams, v.Interface())
 			}
 		}
-		return t.Request(ctx, "/"+interfaceKey+"/"+methodName, reqParams, reply)
+
+		var innerCodec encoding.Codec
+		switch t.opt.CodecType {
+		case constant.HessianCodecName:
+			innerCodec = hessian.NewHessianCodec()
+		case constant.MsgPackCodecName:
+			innerCodec = msgpack.NewMsgPackCodec()
+		default:
+			panic("unsupport codec = " + t.opt.CodecType)
+		}
+		return t.triplConn.Invoke(ctx, "/"+interfaceKey+"/"+methodName, reqParams, reply, grpc.ForceCodec(
+			encoding.NewPBWrapperTwoWayCodec(string(t.opt.CodecType), innerCodec, raw_proto.NewProtobufCodec())))
 	}
 	return *common.NewErrorWithAttachment(nil, attachment)
-}
-
-// Request call h2Controller to send unary rpc req to server
-// @path is /interfaceKey/functionName e.g. /com.apache.dubbo.sample.basic.IGreeter/BigUnaryTest
-// @arg is request body
-func (t *TripleClient) Request(ctx context.Context, path string, arg, reply interface{}) common.ErrorWithAttachment {
-	return t.h2Controller.UnaryInvoke(ctx, path, arg, reply)
-}
-
-// StreamRequest call h2Controller to send streaming request to sever, to start link.
-// @path is /interfaceKey/functionName e.g. /com.apache.dubbo.sample.basic.IGreeter/BigStreamTest
-func (t *TripleClient) StreamRequest(ctx context.Context, path string) (grpc.ClientStream, error) {
-	return t.h2Controller.StreamInvoke(ctx, path)
 }
 
 // Close destroy http controller and return
 func (t *TripleClient) Close() {
 	t.opt.Logger.Debug("Triple Client Is closing")
-	t.h2Controller.Destroy()
+	t.triplConn.grpcConn.Close()
 }
 
 // IsAvailable returns if triple client is available
 func (t *TripleClient) IsAvailable() bool {
-	return t.h2Controller.IsAvailable()
+	return true
 }
