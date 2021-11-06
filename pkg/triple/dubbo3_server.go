@@ -129,6 +129,7 @@ func createGrpcDesc(serviceName string, service common.TripleUnaryService) *grpc
 						//p.opt.Logger.Debugf("unaryProcessor.processUnaryRPC: generic invoke service with header %+v and args %v", header, args)
 						return base.InvokeWithArgs(ctx, methodName, args)
 					} else {
+
 						reqParam, ok := service.GetReqParamsInterfaces(methodName)
 						if !ok {
 							return nil, perrors.Errorf("method name %s is not provided by service, please check if correct", methodName)
