@@ -1639,7 +1639,7 @@ func (s *Server) handleStream(t transport.ServerTransport, stream *transport.Str
 	}
 	service := sm[:pos]
 	method := sm[pos+1:]
-	method = strings.ToUpper(method) + method[1:]
+	method = strings.ToUpper(string(method[1])) + method[1:]
 
 	srv, knownService := s.services[service]
 	if knownService {
