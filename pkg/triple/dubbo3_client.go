@@ -143,7 +143,9 @@ func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply inter
 // Close destroy http controller and return
 func (t *TripleClient) Close() {
 	t.opt.Logger.Debug("Triple Client Is closing")
-	t.triplConn.grpcConn.Close()
+	if t.triplConn != nil && t.triplConn.grpcConn !=nil{
+		t.triplConn.grpcConn.Close()
+	}
 }
 
 // IsAvailable returns if triple client is available
