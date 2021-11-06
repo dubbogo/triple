@@ -1124,7 +1124,6 @@ func chainUnaryInterceptors(interceptors []UnaryServerInterceptor) UnaryServerIn
 
 func (s *Server) processUnaryRPC(method string, t transport.ServerTransport, stream *transport.Stream, info *serviceInfo, md *MethodDesc, trInfo *traceInfo) (err error) {
 	sh := s.opts.statsHandler
-	method = strings.ToUpper(method) + method[1:]
 	if sh != nil || trInfo != nil || channelz.IsOn() {
 		if channelz.IsOn() {
 			s.incrCallsStarted()
@@ -1640,6 +1639,7 @@ func (s *Server) handleStream(t transport.ServerTransport, stream *transport.Str
 	}
 	service := sm[:pos]
 	method := sm[pos+1:]
+	method = strings.ToUpper(method) + method[1:]
 
 	srv, knownService := s.services[service]
 	if knownService {
