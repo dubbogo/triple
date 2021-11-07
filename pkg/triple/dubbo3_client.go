@@ -19,19 +19,19 @@ package triple
 
 import (
 	"context"
-	"github.com/dubbogo/triple/pkg/grpc/codes"
-	"github.com/dubbogo/triple/pkg/grpc/encoding/tools"
-	"github.com/dubbogo/triple/pkg/grpc/status"
+	"github.com/dubbogo/grpc-go/codes"
+	"github.com/dubbogo/grpc-go/encoding/tools"
+	"github.com/dubbogo/grpc-go/status"
 	"reflect"
 	"sync"
 )
 
 import (
-	"github.com/dubbogo/triple/pkg/grpc"
-	"github.com/dubbogo/triple/pkg/grpc/encoding"
-	"github.com/dubbogo/triple/pkg/grpc/encoding/hessian"
-	"github.com/dubbogo/triple/pkg/grpc/encoding/msgpack"
-	"github.com/dubbogo/triple/pkg/grpc/encoding/raw_proto"
+	"github.com/dubbogo/grpc-go"
+	"github.com/dubbogo/grpc-go/encoding"
+	"github.com/dubbogo/grpc-go/encoding/hessian"
+	"github.com/dubbogo/grpc-go/encoding/msgpack"
+	"github.com/dubbogo/grpc-go/encoding/raw_proto"
 )
 
 import (

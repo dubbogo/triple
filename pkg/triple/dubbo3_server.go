@@ -27,10 +27,10 @@ import (
 
 import (
 	hessian "github.com/apache/dubbo-go-hessian2"
-	"github.com/dubbogo/triple/pkg/grpc"
-	"github.com/dubbogo/triple/pkg/grpc/encoding"
-	"github.com/dubbogo/triple/pkg/grpc/encoding/proto_wrapper_api"
-	"github.com/dubbogo/triple/pkg/grpc/encoding/raw_proto"
+	"github.com/dubbogo/grpc-go"
+	"github.com/dubbogo/grpc-go/encoding"
+	"github.com/dubbogo/grpc-go/encoding/proto_wrapper_api"
+	"github.com/dubbogo/grpc-go/encoding/raw_proto"
 	perrors "github.com/pkg/errors"
 )
 
@@ -42,6 +42,7 @@ import (
 // TripleServer is the object that can be started and listening remote request
 type TripleServer struct {
 	lst           net.Listener
+	grpcServer    *grpc.Server
 	rpcServiceMap *sync.Map
 	registeredKey map[string]bool
 	// config
@@ -207,25 +208,28 @@ func (t *TripleServer) Start() {
 
 	go grpcServer.Serve(lst)
 	t.lst = lst
+	t.grpcServer = grpcServer
 }
 
 func (t *TripleServer) RefreshService() {
 	t.opt.Logger.Debugf("TripleServer.Refresh: call refresh services")
+	grpcServer := grpc.NewServer()
 	t.rpcServiceMap.Range(func(key, value interface{}) bool {
-		if _, ok := t.registeredKey[key.(string)]; ok {
-			return true
-		}
-		grpcServer := grpc.NewServer()
 		grpcService, ok := value.(common.TripleGrpcService)
 		if ok {
 			desc := grpcService.XXX_ServiceDesc()
 			desc.ServiceName = key.(string)
 			grpcServer.RegisterService(desc, value)
-			return true
+		} else {
+			desc := createGrpcDesc(key.(string), value.(common.TripleUnaryService))
+			grpcServer.RegisterService(desc, value)
 		}
-		desc := createGrpcDesc(key.(string), value.(common.TripleUnaryService))
-		grpcServer.RegisterService(desc, value)
-		go grpcServer.Serve(t.lst)
 		return true
 	})
+	t.grpcServer.Stop()
+	t.lst.Close()
+	lst, _ := net.Listen("tcp", t.opt.Location)
+	go grpcServer.Serve(lst)
+	t.grpcServer = grpcServer
+	t.lst = lst
 }

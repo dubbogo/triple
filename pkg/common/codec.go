@@ -2,8 +2,8 @@ package common
 
 import (
 	"fmt"
-	"github.com/dubbogo/triple/pkg/grpc/encoding"
-	"github.com/dubbogo/triple/pkg/grpc/encoding/raw_proto"
+	"github.com/dubbogo/grpc-go/encoding"
+	"github.com/dubbogo/grpc-go/encoding/raw_proto"
 )
 
 import (
