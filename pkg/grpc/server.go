@@ -1280,6 +1280,7 @@ func (s *Server) processUnaryRPC(method string, t transport.ServerTransport, str
 	}
 	ctx := NewContextWithServerTransportStream(stream.Context(), stream)
 	ctx = context.WithValue(ctx, "XXX_TRIPLE_GO_METHOD_NAME", method)
+	ctx = context.WithValue(ctx, "XXX_TRIPLE_GO_GENERIC_PAYLOAD", d)
 	reply, appErr := md.Handler(info.serviceImpl, ctx, df, s.opts.unaryInt)
 	if appErr != nil {
 		appStatus, ok := status.FromError(appErr)

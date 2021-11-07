@@ -26,7 +26,10 @@ import (
 )
 
 import (
+	hessian "github.com/apache/dubbo-go-hessian2"
 	"github.com/dubbogo/triple/pkg/grpc"
+	"github.com/dubbogo/triple/pkg/grpc/encoding/proto_wrapper_api"
+	"github.com/dubbogo/triple/pkg/grpc/encoding/raw_proto"
 	perrors "github.com/pkg/errors"
 )
 
@@ -108,7 +111,39 @@ func _Greeter_SayHello_Handler(srv interface{}, ctx context.Context, dec func(in
 }
 */
 
+func newGenericCodec() common.GenericCodec {
+	return &GenericCodec{
+		codec: raw_proto.NewProtobufCodec(),
+	}
+}
+
+// GenericCodec is pb impl of TwoWayCodec
+type GenericCodec struct {
+	codec common.Codec
+}
+
+// UnmarshalRequest unmarshal bytes @data to interface
+func (h *GenericCodec) UnmarshalRequest(data []byte) ([]interface{}, error) {
+	wrapperRequest := proto_wrapper_api.TripleRequestWrapper{}
+	err := h.codec.Unmarshal(data, &wrapperRequest)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]interface{}, 0, len(wrapperRequest.Args))
+
+	for _, value := range wrapperRequest.Args {
+		decoder := hessian.NewDecoder(value)
+		val, err := decoder.Decode()
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, val)
+	}
+	return result, nil
+}
+
 func createGrpcDesc(serviceName string, service common.TripleUnaryService) *grpc.ServiceDesc {
+	genericCodec := newGenericCodec()
 	return &grpc.ServiceDesc{
 		ServiceName: serviceName,
 		HandlerType: (*common.TripleUnaryService)(nil),
@@ -117,16 +152,13 @@ func createGrpcDesc(serviceName string, service common.TripleUnaryService) *grpc
 				MethodName: "InvokeWithArgs",
 				Handler: func(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 					methodName := ctx.Value("XXX_TRIPLE_GO_METHOD_NAME").(string)
+					genericPayload, ok := ctx.Value("XXX_TRIPLE_GO_GENERIC_PAYLOAD").([]byte)
 					base := srv.(common.TripleUnaryService)
-					if methodName == "$invoke" {
-						var args []interface{}
-						// todo generic invocation
-						//args, err = p.genericCodec.UnmarshalRequest(readBuf)
-						//if err != nil {
-						//	p.opt.Logger.Errorf("unaryProcessor.processUnaryRPC: generic invoke with request %s unmarshal error = %s", string(readBuf), err.Error())
-						//	return nil, *common.NewErrorWithAttachment(status.Errorf(codes.Internal, "generic invoke with request %s unmarshal error = %s", string(readBuf), err.Error()), responseAttachment)
-						//}
-						//p.opt.Logger.Debugf("unaryProcessor.processUnaryRPC: generic invoke service with header %+v and args %v", header, args)
+					if methodName == "$invoke" && ok {
+						args, err := genericCodec.UnmarshalRequest(genericPayload)
+						if err != nil {
+							return nil, perrors.Errorf("unaryProcessor.processUnaryRPC: generic invoke with request %s unmarshal error = %s", string(genericPayload), err.Error())
+						}
 						return base.InvokeWithArgs(ctx, methodName, args)
 					} else {
 
