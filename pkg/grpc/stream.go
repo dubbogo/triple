@@ -158,9 +158,11 @@ func (cc *ClientConn) NewStream(ctx context.Context, desc *StreamDesc, method st
 	return newClientStream(ctx, desc, cc, method, opts...)
 }
 
+var streamStreamDesc = &StreamDesc{ServerStreams: true, ClientStreams: true}
+
 // NewClientStream is a wrapper for ClientConn.NewStream.
-func NewClientStream(ctx context.Context, desc *StreamDesc, cc *ClientConn, method string, opts ...CallOption) (ClientStream, error) {
-	return cc.NewStream(ctx, desc, method, opts...)
+func NewClientStream(ctx context.Context, cc *ClientConn, method string, opts ...CallOption) (ClientStream, error) {
+	return cc.NewStream(ctx, streamStreamDesc, method, opts...)
 }
 
 func newClientStream(ctx context.Context, desc *StreamDesc, cc *ClientConn, method string, opts ...CallOption) (_ ClientStream, err error) {

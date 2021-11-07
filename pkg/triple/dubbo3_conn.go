@@ -51,8 +51,7 @@ func (t *TripleConn) Invoke(ctx context.Context, method string, args, reply inte
 // NewStream called when streaming rpc 's pb.go file
 // @method is /interfaceKey/functionName e.g. /com.apache.dubbo.sample.basic.IGreeter/BigStreamTest
 func (t *TripleConn) NewStream(ctx context.Context, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
-	panic("stream is not support yet")
-	return nil, nil
+	return grpc.NewClientStream(ctx, t.grpcConn, method, opts...)
 }
 
 // newTripleConn new a triple conn with given @tripleclient, which contains all net logic
