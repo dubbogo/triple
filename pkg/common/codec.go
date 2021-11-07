@@ -2,6 +2,8 @@ package common
 
 import (
 	"fmt"
+	"github.com/dubbogo/triple/pkg/grpc/encoding"
+	"github.com/dubbogo/triple/pkg/grpc/encoding/raw_proto"
 )
 
 import (
@@ -13,16 +15,8 @@ import (
 	"github.com/dubbogo/triple/pkg/config"
 )
 
-// Codec is used to marshal interface to bytes and unmarshal bytes to interface.
-// It is not used directly by triple network, instead, it used by TwoWayCodec, and TwoWayCodec is
-// directly used by triple processor/h2Controller
-type Codec interface {
-	Marshal(interface{}) ([]byte, error)
-	Unmarshal(data []byte, v interface{}) error
-}
-
 // CodecFactory is Codec Factory
-type CodecFactory func() Codec
+type CodecFactory func() encoding.Codec
 
 // codecFactoryMap stores map
 var codecFactoryMap = make(map[string]CodecFactory)
@@ -32,6 +26,7 @@ var codecInWrapperSerializerTypeMap = make(map[string]string)
 
 // SetTripleCodec register CodecFactory @f and CodecType @codecType, with @opt[0].SerializerTypeInWrapper
 func SetTripleCodec(codecType constant.CodecType, f CodecFactory, opt ...*config.Option) {
+	encoding.RegisterCodec(encoding.NewPBWrapperTwoWayCodec(string(codecType), f(), raw_proto.NewProtobufCodec()))
 	codecFactoryMap[string(codecType)] = f
 	if len(opt) == 0 {
 		return
@@ -43,7 +38,7 @@ func SetTripleCodec(codecType constant.CodecType, f CodecFactory, opt ...*config
 }
 
 // GetTripleCodec get Codec impl by @codecName
-func GetTripleCodec(codecName constant.CodecType) (Codec, error) {
+func GetTripleCodec(codecName constant.CodecType) (encoding.Codec, error) {
 	if f, ok := codecFactoryMap[string(codecName)]; ok {
 		return f(), nil
 	}

@@ -28,6 +28,7 @@ import (
 import (
 	hessian "github.com/apache/dubbo-go-hessian2"
 	"github.com/dubbogo/triple/pkg/grpc"
+	"github.com/dubbogo/triple/pkg/grpc/encoding"
 	"github.com/dubbogo/triple/pkg/grpc/encoding/proto_wrapper_api"
 	"github.com/dubbogo/triple/pkg/grpc/encoding/raw_proto"
 	perrors "github.com/pkg/errors"
@@ -119,7 +120,7 @@ func newGenericCodec() common.GenericCodec {
 
 // GenericCodec is pb impl of TwoWayCodec
 type GenericCodec struct {
-	codec common.Codec
+	codec encoding.Codec
 }
 
 // UnmarshalRequest unmarshal bytes @data to interface

@@ -53,7 +53,7 @@ type TripleClient struct {
 	opt *config.Option
 
 	// serializer is triple serializer to do codec
-	serializer common.Codec
+	serializer encoding.Codec
 }
 
 // NewTripleClient creates triple client
@@ -69,18 +69,7 @@ func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error
 		// put dubbo3 network logic to tripleConn, creat pb stub invoker
 		tripleClient.stubInvoker = reflect.ValueOf(getInvoker(impl, newTripleConn(opt.Location)))
 	} else {
-		var innerCodec encoding.Codec
-		switch opt.CodecType {
-		case constant.HessianCodecName:
-			innerCodec = hessian.NewHessianCodec()
-		case constant.MsgPackCodecName:
-			innerCodec = msgpack.NewMsgPackCodec()
-		default:
-			panic("unsupport codec = " + opt.CodecType)
-		}
-		tripleClient.triplConn = newTripleConn(opt.Location, grpc.WithDefaultCallOptions(grpc.ForceCodec(
-			encoding.NewPBWrapperTwoWayCodec(string(opt.CodecType), innerCodec, raw_proto.NewProtobufCodec()),
-		)))
+		tripleClient.triplConn = newTripleConn(opt.Location)
 	}
 
 	return tripleClient, nil
@@ -126,13 +115,17 @@ func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply inter
 		}
 
 		var innerCodec encoding.Codec
+		var err error
 		switch t.opt.CodecType {
 		case constant.HessianCodecName:
 			innerCodec = hessian.NewHessianCodec()
 		case constant.MsgPackCodecName:
 			innerCodec = msgpack.NewMsgPackCodec()
 		default:
-			panic("unsupport codec = " + t.opt.CodecType)
+			innerCodec, err = common.GetTripleCodec(t.opt.CodecType)
+			if err != nil {
+				return *common.NewErrorWithAttachment(status.Errorf(codes.Unimplemented, "TripleClient.Invoke: serialization %s not impl in triple client api.", t.opt.CodecType), attachment)
+			}
 		}
 		return t.triplConn.Invoke(ctx, "/"+interfaceKey+"/"+methodName, reqParams, reply, grpc.ForceCodec(
 			encoding.NewPBWrapperTwoWayCodec(string(t.opt.CodecType), innerCodec, raw_proto.NewProtobufCodec())))
