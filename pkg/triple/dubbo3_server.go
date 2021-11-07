@@ -19,23 +19,28 @@ package triple
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"reflect"
 	"sync"
-
-	"net"
 )
 
 import (
 	hessian "github.com/apache/dubbo-go-hessian2"
+
 	"github.com/dubbogo/grpc-go"
 	"github.com/dubbogo/grpc-go/encoding"
+	hessianGRPCCodec "github.com/dubbogo/grpc-go/encoding/hessian"
+	"github.com/dubbogo/grpc-go/encoding/msgpack"
 	"github.com/dubbogo/grpc-go/encoding/proto_wrapper_api"
 	"github.com/dubbogo/grpc-go/encoding/raw_proto"
+
 	perrors "github.com/pkg/errors"
 )
 
 import (
 	"github.com/dubbogo/triple/pkg/common"
+	"github.com/dubbogo/triple/pkg/common/constant"
 	"github.com/dubbogo/triple/pkg/config"
 )
 
@@ -184,14 +189,32 @@ func createGrpcDesc(serviceName string, service common.TripleUnaryService) *grpc
 	}
 }
 
+func newGrpcServerWithCodec(codecType constant.CodecType) *grpc.Server {
+	var innerCodec encoding.Codec
+	var err error
+	switch codecType {
+	case constant.PBCodecName:
+		return grpc.NewServer()
+	case constant.HessianCodecName:
+		innerCodec = hessianGRPCCodec.NewHessianCodec()
+	case constant.MsgPackCodecName:
+		innerCodec = msgpack.NewMsgPackCodec()
+	default:
+		innerCodec, err = common.GetTripleCodec(codecType)
+		if err != nil {
+			fmt.Printf("TripleServer.Start: serialization %s not supported", codecType)
+		}
+	}
+	return grpc.NewServer(grpc.ForceServerCodec(encoding.NewPBWrapperTwoWayCodec(string(codecType), innerCodec, raw_proto.NewProtobufCodec())))
+}
+
 // Start can start a triple server
 func (t *TripleServer) Start() {
-	grpcServer := grpc.NewServer()
 	lst, err := net.Listen("tcp", t.opt.Location)
 	if err != nil {
 		panic(err)
 	}
-
+	grpcServer := newGrpcServerWithCodec(t.opt.CodecType)
 	t.rpcServiceMap.Range(func(key, value interface{}) bool {
 		t.registeredKey[key.(string)] = true
 		grpcService, ok := value.(common.TripleGrpcService)
@@ -213,7 +236,7 @@ func (t *TripleServer) Start() {
 
 func (t *TripleServer) RefreshService() {
 	t.opt.Logger.Debugf("TripleServer.Refresh: call refresh services")
-	grpcServer := grpc.NewServer()
+	grpcServer := newGrpcServerWithCodec(t.opt.CodecType)
 	t.rpcServiceMap.Range(func(key, value interface{}) bool {
 		grpcService, ok := value.(common.TripleGrpcService)
 		if ok {

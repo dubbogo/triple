@@ -8,16 +8,22 @@ package proto
 
 import (
 	context "context"
+	fmt "fmt"
+)
+
+import (
 	protocol "dubbo.apache.org/dubbo-go/v3/protocol"
 	dubbo3 "dubbo.apache.org/dubbo-go/v3/protocol/dubbo3"
 	invocation "dubbo.apache.org/dubbo-go/v3/protocol/invocation"
-	fmt "fmt"
+)
+
+import (
 	common "github.com/dubbogo/triple/pkg/common"
 	constant "github.com/dubbogo/triple/pkg/common/constant"
-	triple "github.com/dubbogo/triple/pkg/triple"
 	grpc "github.com/dubbogo/triple/pkg/grpc"
 	codes "github.com/dubbogo/triple/pkg/grpc/codes"
 	status "github.com/dubbogo/triple/pkg/grpc/status"
+	triple "github.com/dubbogo/triple/pkg/triple"
 )
 
 // This is a compile-time assertion to ensure that this generated file

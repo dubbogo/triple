@@ -2,11 +2,12 @@ package common
 
 import (
 	"fmt"
-	"github.com/dubbogo/grpc-go/encoding"
-	"github.com/dubbogo/grpc-go/encoding/raw_proto"
 )
 
 import (
+	"github.com/dubbogo/grpc-go/encoding"
+	"github.com/dubbogo/grpc-go/encoding/raw_proto"
+
 	perrors "github.com/pkg/errors"
 )
 
