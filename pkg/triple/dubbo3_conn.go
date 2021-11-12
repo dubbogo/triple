@@ -41,11 +41,13 @@ type TripleConn struct {
 // @method is /interfaceKey/functionName e.g. /com.apache.dubbo.sample.basic.IGreeter/BigUnaryTest
 // @arg is request body, must be proto.Message type
 func (t *TripleConn) Invoke(ctx context.Context, method string, args, reply interface{}, opts ...grpc.CallOption) common.ErrorWithAttachment {
-	//grpc.Combine()
-
 	//return t.client.Request(ctx, method, args, reply)
-	err := grpc.GRPCConnInvoke(ctx, method, args, reply, t.grpcConn, opts...)
-	return *common.NewErrorWithAttachment(err, nil)
+	err, trailer := grpc.GRPCConnInvokeWithTrailer(ctx, method, args, reply, t.grpcConn, opts...)
+	atta := make(common.DubboAttachment, len(trailer))
+	for k, v := range trailer {
+		atta[k] = v
+	}
+	return *common.NewErrorWithAttachment(err, atta)
 }
 
 // NewStream called when streaming rpc 's pb.go file

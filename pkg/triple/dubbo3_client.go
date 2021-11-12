@@ -79,7 +79,7 @@ func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error
 func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply interface{}) common.ErrorWithAttachment {
 	t.opt.Logger.Debugf("TripleClient.Invoke: methodName = %s, inputValue = %+v, expected reply struct = %+v, client defined codec = %s",
 		methodName, in, reply, t.opt.CodecType)
-	attachment := make(common.TripleAttachment)
+	attachment := make(common.DubboAttachment)
 	if t.opt.CodecType == constant.PBCodecName {
 		method := t.stubInvoker.MethodByName(methodName)
 		if method.IsZero() {

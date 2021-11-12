@@ -36,7 +36,6 @@ type TripleUnaryService interface {
 	GetReqParamsInterfaces(methodName string) ([]interface{}, bool)
 }
 
-type TripleAttachment map[string]string
 type DubboAttachment map[string]interface{}
 
 // OuterResult is a dubbo RPC result
@@ -49,17 +48,17 @@ type OuterResult interface {
 
 type ErrorWithAttachment struct {
 	err         error
-	attachments TripleAttachment
+	attachments DubboAttachment
 }
 
-func NewErrorWithAttachment(err error, attachments TripleAttachment) *ErrorWithAttachment {
+func NewErrorWithAttachment(err error, attachments DubboAttachment) *ErrorWithAttachment {
 	return &ErrorWithAttachment{
 		err:         err,
 		attachments: attachments,
 	}
 }
 
-func (e *ErrorWithAttachment) GetAttachments() TripleAttachment {
+func (e *ErrorWithAttachment) GetAttachments() DubboAttachment {
 	return e.attachments
 }
 
