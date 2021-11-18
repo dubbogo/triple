@@ -41,7 +41,6 @@ func OpenTracingClientInterceptor(tracer opentracing.Tracer, optFuncs ...Option)
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
 	) (metadata.MD, error) {
-		var err error
 		var parentCtx opentracing.SpanContext
 		if parent := opentracing.SpanFromContext(ctx); parent != nil {
 			parentCtx = parent.Context()
@@ -61,8 +60,7 @@ func OpenTracingClientInterceptor(tracer opentracing.Tracer, optFuncs ...Option)
 		if otgrpcOpts.logPayloads {
 			clientSpan.LogFields(log.Object("gRPC request", req))
 		}
-		trailer := make(metadata.MD)
-		trailer, err = invoker(ctx, method, req, resp, cc, opts...)
+		trailer, err := invoker(ctx, method, req, resp, cc, opts...)
 		if err == nil {
 			if otgrpcOpts.logPayloads {
 				clientSpan.LogFields(log.Object("gRPC response", resp))

@@ -97,12 +97,12 @@ func OpenTracingStreamServerInterceptor(tracer opentracing.Tracer, optFuncs ...O
 	otgrpcOpts := newOptions()
 	otgrpcOpts.apply(optFuncs...)
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		spanContext, err := extractSpanContext(ss.Context(), tracer)
-		if err != nil && err != opentracing.ErrSpanContextNotFound {
-			// TODO: establish some sort of error reporting mechanism here. We
-			// don't know where to put such an error and must rely on Tracer
-			// implementations to do something appropriate for the time being.
-		}
+		spanContext, _ := extractSpanContext(ss.Context(), tracer)
+		//if e != nil && e != opentracing.ErrSpanContextNotFound {
+		// TODO: establish some sort of error reporting mechanism here. We
+		// don't know where to put such an error and must rely on Tracer
+		// implementations to do something appropriate for the time being.
+		//}
 		if otgrpcOpts.inclusionFunc != nil &&
 			!otgrpcOpts.inclusionFunc(spanContext, info.FullMethod, nil, nil) {
 			return handler(srv, ss)
@@ -118,15 +118,15 @@ func OpenTracingStreamServerInterceptor(tracer opentracing.Tracer, optFuncs ...O
 			ServerStream: ss,
 			ctx:          opentracing.ContextWithSpan(ss.Context(), serverSpan),
 		}
-		err = handler(srv, ss)
-		if err != nil {
-			SetSpanTags(serverSpan, err, false)
-			serverSpan.LogFields(log.String("event", "error"), log.String("message", err.Error()))
+		e := handler(srv, ss)
+		if e != nil {
+			SetSpanTags(serverSpan, e, false)
+			serverSpan.LogFields(log.String("event", "error"), log.String("message", e.Error()))
 		}
 		if otgrpcOpts.decorator != nil {
-			otgrpcOpts.decorator(ss.Context(), serverSpan, info.FullMethod, nil, nil, err)
+			otgrpcOpts.decorator(ss.Context(), serverSpan, info.FullMethod, nil, nil, e)
 		}
-		return err
+		return e
 	}
 }
 
@@ -223,7 +223,7 @@ func (o *options) apply(opts ...Option) {
 
 var (
 	// Morally a const:
-	gRPCComponentTag = opentracing.Tag{string(ext.Component), "gRPC"}
+	gRPCComponentTag = opentracing.Tag{Key: string(ext.Component), Value: "gRPC"}
 )
 
 // metadataReaderWriter satisfies both the opentracing.TextMapReader and

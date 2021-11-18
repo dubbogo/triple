@@ -35,8 +35,6 @@ import (
 	"github.com/dubbogo/grpc-go/encoding/proto_wrapper_api"
 	"github.com/dubbogo/grpc-go/encoding/raw_proto"
 
-	"github.com/opentracing/opentracing-go"
-
 	perrors "github.com/pkg/errors"
 )
 
@@ -199,9 +197,8 @@ func newGrpcServerWithCodec(opt *config.Option) *grpc.Server {
 	var innerCodec encoding.Codec
 	serverOpts := []grpc.ServerOption{}
 
-	if opt.JaegerEndpoint != "" {
-		tracer := tracing.NewJaegerTracerDirect(opt.JaegerServiceName, opt.JaegerEndpoint, opt.Logger)
-		opentracing.SetGlobalTracer(tracer)
+	if opt.JaegerAddress != "" {
+		tracer := tracing.NewJaegerTracerDirect(opt.JaegerServiceName, opt.JaegerAddress, opt.Logger)
 		serverOpts = append(serverOpts,
 			grpc.UnaryInterceptor(tracing.OpenTracingServerInterceptor(tracer)),
 			grpc.StreamInterceptor(tracing.OpenTracingStreamServerInterceptor(tracer)),

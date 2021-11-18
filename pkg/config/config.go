@@ -41,8 +41,9 @@ type Option struct {
 	HeaderAppVersion string
 
 	// tracing
-	JaegerEndpoint    string
+	JaegerAddress     string
 	JaegerServiceName string
+	JaegerUseAgent    bool
 
 	// logger
 	Logger loggerInteface.Logger
@@ -165,9 +166,10 @@ func WithNumWorker(numWorkers uint32) OptionFunction {
 	}
 }
 
-func WithJaegerEndpointAndServiceName(endpoint, serviceName string) OptionFunction {
+func WithJaegerConfig(address, serviceName string, useAgent bool) OptionFunction {
 	return func(o *Option) {
-		o.JaegerEndpoint = endpoint
+		o.JaegerAddress = address
 		o.JaegerServiceName = serviceName
+		o.JaegerUseAgent = useAgent
 	}
 }

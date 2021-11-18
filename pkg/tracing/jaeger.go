@@ -19,22 +19,26 @@ func (j *jaegerLogger) Error(msg string) {
 	j.Logger.Error(msg)
 }
 
-func NewJaegerTracerDirect(service, endpoint string, logger logger.Logger) opentracing.Tracer {
+func NewJaegerTracerDirect(service, httpEndpoint string, logger logger.Logger) opentracing.Tracer {
 	sender := transport.NewHTTPTransport(
-		endpoint,
+		httpEndpoint,
 	)
 	tracer, _ := jaeger.NewTracer(service,
 		jaeger.NewConstSampler(true),
-		jaeger.NewRemoteReporter(sender, jaeger.ReporterOptions.Logger(jaeger.StdLogger)),
+		jaeger.NewRemoteReporter(sender, jaeger.ReporterOptions.Logger(&jaegerLogger{
+			Logger: logger,
+		})),
 	)
 	return tracer
 }
 
-func NewJaegerTracerAgent(service, endpoint string) opentracing.Tracer {
-	sender, _ := jaeger.NewUDPTransport(endpoint, 0)
+func NewJaegerTracerAgent(service, agentAddress string, logger logger.Logger) opentracing.Tracer {
+	sender, _ := jaeger.NewUDPTransport(agentAddress, 0)
 	tracer, _ := jaeger.NewTracer(service,
 		jaeger.NewConstSampler(true),
-		jaeger.NewRemoteReporter(sender, jaeger.ReporterOptions.Logger(jaeger.StdLogger)),
+		jaeger.NewRemoteReporter(sender, jaeger.ReporterOptions.Logger(&jaegerLogger{
+			Logger: logger,
+		})),
 	)
 	return tracer
 }

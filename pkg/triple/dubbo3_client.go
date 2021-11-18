@@ -71,9 +71,14 @@ func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error
 		opt: opt,
 	}
 	dialOpts := []grpc.DialOption{}
-	if opt.JaegerEndpoint != "" {
-		tracer := tracing.NewJaegerTracerDirect(opt.JaegerServiceName, opt.JaegerEndpoint, opt.Logger)
-		opentracing.SetGlobalTracer(tracer)
+	if opt.JaegerAddress != "" {
+		var tracer opentracing.Tracer
+		if !opt.JaegerUseAgent {
+			tracer = tracing.NewJaegerTracerDirect(opt.JaegerServiceName, opt.JaegerAddress, opt.Logger)
+		} else {
+			tracer = tracing.NewJaegerTracerAgent(opt.JaegerServiceName, opt.JaegerAddress, opt.Logger)
+		}
+
 		dialOpts = append(dialOpts,
 			grpc.WithUnaryInterceptor(tracing.OpenTracingClientInterceptor(tracer)),
 			grpc.WithStreamInterceptor(tracing.OpenTracingStreamClientInterceptor(tracer)),
