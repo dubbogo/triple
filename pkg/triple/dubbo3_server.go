@@ -35,6 +35,8 @@ import (
 	"github.com/dubbogo/grpc-go/encoding/proto_wrapper_api"
 	"github.com/dubbogo/grpc-go/encoding/raw_proto"
 
+	"github.com/opentracing/opentracing-go"
+
 	perrors "github.com/pkg/errors"
 )
 
@@ -42,6 +44,7 @@ import (
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
 	"github.com/dubbogo/triple/pkg/config"
+	"github.com/dubbogo/triple/pkg/tracing"
 )
 
 // TripleServer is the object that can be started and listening remote request
@@ -57,6 +60,9 @@ type TripleServer struct {
 // NewTripleServer can create Server with url and some user impl providers stored in @serviceMap
 // @serviceMap should be sync.Map: "interfaceKey" -> Dubbo3GrpcService
 func NewTripleServer(serviceMap *sync.Map, opt *config.Option) *TripleServer {
+	if opt == nil {
+		opt = config.NewTripleOption()
+	}
 	return &TripleServer{
 		rpcServiceMap: serviceMap,
 		opt:           opt,
@@ -189,23 +195,36 @@ func createGrpcDesc(serviceName string, service common.TripleUnaryService) *grpc
 	}
 }
 
-func newGrpcServerWithCodec(codecType constant.CodecType) *grpc.Server {
+func newGrpcServerWithCodec(opt *config.Option) *grpc.Server {
 	var innerCodec encoding.Codec
+	serverOpts := []grpc.ServerOption{}
+
+	if opt.JaegerEndpoint != "" {
+		tracer := tracing.NewJaegerTracerDirect(opt.JaegerServiceName, opt.JaegerEndpoint, opt.Logger)
+		opentracing.SetGlobalTracer(tracer)
+		serverOpts = append(serverOpts,
+			grpc.UnaryInterceptor(tracing.OpenTracingServerInterceptor(tracer)),
+			grpc.StreamInterceptor(tracing.OpenTracingStreamServerInterceptor(tracer)),
+		)
+	}
+
 	var err error
-	switch codecType {
+	switch opt.CodecType {
 	case constant.PBCodecName:
-		return grpc.NewServer()
+		return grpc.NewServer(serverOpts...)
 	case constant.HessianCodecName:
 		innerCodec = hessianGRPCCodec.NewHessianCodec()
 	case constant.MsgPackCodecName:
 		innerCodec = msgpack.NewMsgPackCodec()
 	default:
-		innerCodec, err = common.GetTripleCodec(codecType)
+		innerCodec, err = common.GetTripleCodec(opt.CodecType)
 		if err != nil {
-			fmt.Printf("TripleServer.Start: serialization %s not supported", codecType)
+			fmt.Printf("TripleServer.Start: serialization %s not supported", opt.CodecType)
 		}
 	}
-	return grpc.NewServer(grpc.ForceServerCodec(encoding.NewPBWrapperTwoWayCodec(string(codecType), innerCodec, raw_proto.NewProtobufCodec())))
+	serverOpts = append(serverOpts, grpc.ForceServerCodec(encoding.NewPBWrapperTwoWayCodec(string(opt.CodecType), innerCodec, raw_proto.NewProtobufCodec())))
+
+	return grpc.NewServer(serverOpts...)
 }
 
 // Start can start a triple server
@@ -214,7 +233,7 @@ func (t *TripleServer) Start() {
 	if err != nil {
 		panic(err)
 	}
-	grpcServer := newGrpcServerWithCodec(t.opt.CodecType)
+	grpcServer := newGrpcServerWithCodec(t.opt)
 	t.rpcServiceMap.Range(func(key, value interface{}) bool {
 		t.registeredKey[key.(string)] = true
 		grpcService, ok := value.(common.TripleGrpcService)
@@ -236,7 +255,7 @@ func (t *TripleServer) Start() {
 
 func (t *TripleServer) RefreshService() {
 	t.opt.Logger.Debugf("TripleServer.Refresh: call refresh services")
-	grpcServer := newGrpcServerWithCodec(t.opt.CodecType)
+	grpcServer := newGrpcServerWithCodec(t.opt)
 	t.rpcServiceMap.Range(func(key, value interface{}) bool {
 		grpcService, ok := value.(common.TripleGrpcService)
 		if ok {

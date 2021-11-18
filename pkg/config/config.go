@@ -40,6 +40,10 @@ type Option struct {
 	HeaderGroup      string
 	HeaderAppVersion string
 
+	// tracing
+	JaegerEndpoint    string
+	JaegerServiceName string
+
 	// logger
 	Logger loggerInteface.Logger
 
@@ -87,7 +91,7 @@ func NewTripleOption(fs ...OptionFunction) *Option {
 	for _, v := range fs {
 		v(opt)
 	}
-
+	opt.Validate()
 	return opt
 }
 
@@ -158,5 +162,12 @@ func WithSerializerTypeInWrapper(name string) OptionFunction {
 func WithNumWorker(numWorkers uint32) OptionFunction {
 	return func(o *Option) {
 		o.NumWorkers = numWorkers
+	}
+}
+
+func WithJaegerEndpointAndServiceName(endpoint, serviceName string) OptionFunction {
+	return func(o *Option) {
+		o.JaegerEndpoint = endpoint
+		o.JaegerServiceName = serviceName
 	}
 }

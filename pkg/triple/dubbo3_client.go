@@ -32,12 +32,15 @@ import (
 	"github.com/dubbogo/grpc-go/encoding/raw_proto"
 	"github.com/dubbogo/grpc-go/encoding/tools"
 	"github.com/dubbogo/grpc-go/status"
+
+	"github.com/opentracing/opentracing-go"
 )
 
 import (
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
 	"github.com/dubbogo/triple/pkg/config"
+	"github.com/dubbogo/triple/pkg/tracing"
 )
 
 // TripleClient client endpoint that using triple protocol
@@ -61,17 +64,28 @@ type TripleClient struct {
 // @impl must have method: GetDubboStub(cc *dubbo3.TripleConn) interface{}, to be capable with grpc
 // @opt is used to init http2 controller, if it's nil, use the default config
 func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error) {
+	if opt == nil {
+		opt = config.NewTripleOption()
+	}
 	tripleClient := &TripleClient{
 		opt: opt,
+	}
+	dialOpts := []grpc.DialOption{}
+	if opt.JaegerEndpoint != "" {
+		tracer := tracing.NewJaegerTracerDirect(opt.JaegerServiceName, opt.JaegerEndpoint, opt.Logger)
+		opentracing.SetGlobalTracer(tracer)
+		dialOpts = append(dialOpts,
+			grpc.WithUnaryInterceptor(tracing.OpenTracingClientInterceptor(tracer)),
+			grpc.WithStreamInterceptor(tracing.OpenTracingStreamClientInterceptor(tracer)),
+		)
 	}
 
 	if opt.CodecType == constant.PBCodecName {
 		// put dubbo3 network logic to tripleConn, creat pb stub invoker
-		tripleClient.stubInvoker = reflect.ValueOf(getInvoker(impl, newTripleConn(opt.Location)))
+		tripleClient.stubInvoker = reflect.ValueOf(getInvoker(impl, newTripleConn(opt.Location, dialOpts...)))
 	} else {
-		tripleClient.triplConn = newTripleConn(opt.Location)
+		tripleClient.triplConn = newTripleConn(opt.Location, dialOpts...)
 	}
-
 	return tripleClient, nil
 }
 

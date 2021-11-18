@@ -29,10 +29,14 @@ package common
 import (
 	"errors"
 	"fmt"
+)
 
+import (
 	"github.com/dubbogo/grpc-go/codes"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
+
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 )
 
