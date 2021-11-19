@@ -30,6 +30,11 @@ type TripleGrpcService interface {
 	XXX_ServiceDesc() *grpc.ServiceDesc
 }
 
+// TripleGrpcReflectService is gRPC service, used to check impl
+type TripleGrpcReflectService interface {
+	SetGRPCServer(s *grpc.Server)
+}
+
 // TripleUnaryService is normal protocol service (except grpc service), should be implemented by users
 type TripleUnaryService interface {
 	InvokeWithArgs(ctx context.Context, methodName string, arguments []interface{}) (interface{}, error)

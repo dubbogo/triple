@@ -34,7 +34,6 @@ import (
 	"github.com/dubbogo/grpc-go/encoding/msgpack"
 	"github.com/dubbogo/grpc-go/encoding/proto_wrapper_api"
 	"github.com/dubbogo/grpc-go/encoding/raw_proto"
-
 	perrors "github.com/pkg/errors"
 )
 
@@ -238,10 +237,13 @@ func (t *TripleServer) Start() {
 			desc := grpcService.XXX_ServiceDesc()
 			desc.ServiceName = key.(string)
 			grpcServer.RegisterService(desc, value)
-			return true
+		} else {
+			desc := createGrpcDesc(key.(string), value.(common.TripleUnaryService))
+			grpcServer.RegisterService(desc, value)
 		}
-		desc := createGrpcDesc(key.(string), value.(common.TripleUnaryService))
-		grpcServer.RegisterService(desc, value)
+		if key == "grpc.reflection.v1alpha.ServerReflection" {
+			grpcService.(common.TripleGrpcReflectService).SetGRPCServer(grpcServer)
+		}
 		return true
 	})
 
@@ -262,6 +264,9 @@ func (t *TripleServer) RefreshService() {
 		} else {
 			desc := createGrpcDesc(key.(string), value.(common.TripleUnaryService))
 			grpcServer.RegisterService(desc, value)
+		}
+		if key == "grpc.reflection.v1alpha.ServerReflection" {
+			grpcService.(common.TripleGrpcReflectService).SetGRPCServer(grpcServer)
 		}
 		return true
 	})
