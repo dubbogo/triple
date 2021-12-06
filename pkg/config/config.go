@@ -40,6 +40,12 @@ type Option struct {
 	HeaderGroup      string
 	HeaderAppVersion string
 
+	// grpc opts
+	GRPCMaxCallSendMsgSize   int
+	GRPCMaxServerSendMsgSize int
+	GRPCMaxCallRecvMsgSize   int
+	GRPCMaxServerRecvMsgSize int
+
 	// tracing
 	JaegerAddress     string
 	JaegerServiceName string
@@ -163,6 +169,30 @@ func WithSerializerTypeInWrapper(name string) OptionFunction {
 func WithNumWorker(numWorkers uint32) OptionFunction {
 	return func(o *Option) {
 		o.NumWorkers = numWorkers
+	}
+}
+
+func WithGRPCMaxCallSendMessageSize(maxCallSendMsgSize int) OptionFunction {
+	return func(o *Option) {
+		o.GRPCMaxCallSendMsgSize = maxCallSendMsgSize
+	}
+}
+
+func WithGRPCMaxCallRecvMessageSize(maxCallRecvMsgSize int) OptionFunction {
+	return func(o *Option) {
+		o.GRPCMaxCallRecvMsgSize = maxCallRecvMsgSize
+	}
+}
+
+func WithGRPCMaxServerSendMessageSize(maxServerSendMsgSize int) OptionFunction {
+	return func(o *Option) {
+		o.GRPCMaxServerSendMsgSize = maxServerSendMsgSize
+	}
+}
+
+func WithGRPCMaxServerRecvMessageSize(maxServerRecvMsgSize int) OptionFunction {
+	return func(o *Option) {
+		o.GRPCMaxServerRecvMsgSize = maxServerRecvMsgSize
 	}
 }
 

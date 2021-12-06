@@ -85,6 +85,15 @@ func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error
 		)
 	}
 
+	defaultCallOpts := make([]grpc.CallOption, 0)
+	if opt.GRPCMaxCallSendMsgSize != 0 {
+		defaultCallOpts = append(defaultCallOpts, grpc.MaxCallSendMsgSize(opt.GRPCMaxCallSendMsgSize))
+	}
+	if opt.GRPCMaxCallRecvMsgSize != 0 {
+		defaultCallOpts = append(defaultCallOpts, grpc.MaxCallRecvMsgSize(opt.GRPCMaxCallRecvMsgSize))
+	}
+	dialOpts = append(dialOpts, grpc.WithDefaultCallOptions(defaultCallOpts...))
+
 	if opt.CodecType == constant.PBCodecName {
 		// put dubbo3 network logic to tripleConn, creat pb stub invoker
 		tripleClient.stubInvoker = reflect.ValueOf(getInvoker(impl, newTripleConn(opt.Location, dialOpts...)))

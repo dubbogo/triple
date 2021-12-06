@@ -34,6 +34,7 @@ import (
 	"github.com/dubbogo/grpc-go/encoding/msgpack"
 	"github.com/dubbogo/grpc-go/encoding/proto_wrapper_api"
 	"github.com/dubbogo/grpc-go/encoding/raw_proto"
+
 	perrors "github.com/pkg/errors"
 )
 
@@ -202,6 +203,13 @@ func newGrpcServerWithCodec(opt *config.Option) *grpc.Server {
 			grpc.UnaryInterceptor(tracing.OpenTracingServerInterceptor(tracer)),
 			grpc.StreamInterceptor(tracing.OpenTracingStreamServerInterceptor(tracer)),
 		)
+	}
+
+	if opt.GRPCMaxServerRecvMsgSize != 0 {
+		serverOpts = append(serverOpts, grpc.MaxRecvMsgSize(opt.GRPCMaxServerSendMsgSize))
+	}
+	if opt.GRPCMaxCallSendMsgSize != 0 {
+		serverOpts = append(serverOpts, grpc.MaxSendMsgSize(opt.GRPCMaxServerRecvMsgSize))
 	}
 
 	var err error
