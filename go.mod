@@ -15,3 +15,5 @@ require (
 	go.uber.org/zap v1.16.0
 	google.golang.org/genproto v0.0.0-20211104193956-4c6863e31247
 )
+
+replace github.com/dubbogo/grpc-go v1.42.6-triple => ../grpc-go

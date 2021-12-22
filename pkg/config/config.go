@@ -56,6 +56,9 @@ type Option struct {
 
 	// NumWorkers is num of gr in ConnectionPool
 	NumWorkers uint32
+
+	// proxy mode for gateway
+	ProxyModeEnable bool
 }
 
 // Validate sets empty field to default config
@@ -201,5 +204,11 @@ func WithJaegerConfig(address, serviceName string, useAgent bool) OptionFunction
 		o.JaegerAddress = address
 		o.JaegerServiceName = serviceName
 		o.JaegerUseAgent = useAgent
+	}
+}
+
+func WithProxyModeEnable(enable bool) OptionFunction {
+	return func(o *Option) {
+		o.ProxyModeEnable = enable
 	}
 }
