@@ -101,3 +101,8 @@ const (
 	// DefaultNumWorkers #workers for connection pool
 	DefaultNumWorkers = 720
 )
+
+// proxy interface
+const (
+	ProxyServiceKey = "github.com.dubbogo.triple.proxy"
+)

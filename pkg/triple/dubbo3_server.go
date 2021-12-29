@@ -212,6 +212,10 @@ func newGrpcServerWithCodec(opt *config.Option) *grpc.Server {
 		serverOpts = append(serverOpts, grpc.MaxSendMsgSize(opt.GRPCMaxServerRecvMsgSize))
 	}
 
+	if opt.ProxyModeEnable {
+		serverOpts = append(serverOpts, grpc.ProxyModeEnable(true))
+	}
+
 	var err error
 	switch opt.CodecType {
 	case constant.PBCodecName:
