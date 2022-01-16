@@ -34,6 +34,8 @@ import (
 	"github.com/dubbogo/grpc-go/status"
 
 	"github.com/opentracing/opentracing-go"
+
+	"github.com/pkg/errors"
 )
 
 import (
@@ -86,6 +88,7 @@ func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error
 	}
 
 	defaultCallOpts := make([]grpc.CallOption, 0)
+	// max send/receive size
 	if opt.GRPCMaxCallSendMsgSize != 0 {
 		defaultCallOpts = append(defaultCallOpts, grpc.MaxCallSendMsgSize(opt.GRPCMaxCallSendMsgSize))
 	}
@@ -94,11 +97,12 @@ func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error
 	}
 	dialOpts = append(dialOpts, grpc.WithDefaultCallOptions(defaultCallOpts...))
 
+	// codec
 	if opt.CodecType == constant.PBCodecName {
 		// put dubbo3 network logic to tripleConn, creat pb stub invoker
-		tripleClient.stubInvoker = reflect.ValueOf(getInvoker(impl, newTripleConn(opt.Location, dialOpts...)))
+		tripleClient.stubInvoker = reflect.ValueOf(getInvoker(impl, newTripleConn(int(opt.Timeout), opt.Location, dialOpts...)))
 	} else {
-		tripleClient.triplConn = newTripleConn(opt.Location, dialOpts...)
+		tripleClient.triplConn = newTripleConn(int(opt.Timeout), opt.Location, dialOpts...)
 	}
 	return tripleClient, nil
 }
@@ -130,7 +134,23 @@ func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply inter
 			return *common.NewErrorWithAttachment(res[1].Interface().(error), attachment)
 		}
 		t.opt.Logger.Debugf("TripleClient.Invoke: get reply = %+v", res[0])
-		_ = tools.ReflectResponse(res[0], reply)
+
+		// deal with reflection panic
+		errChan := make(chan error)
+		go func() {
+			defer func() {
+				if e := recover(); e != nil {
+					t.opt.Logger.Errorf("TripleClient.Invoke: response reflect to reply error = %+v", e)
+					errChan <- errors.Errorf("TripleClient.Invoke: response reflect to reply error = %+v", e)
+					return
+				}
+				errChan <- nil
+			}()
+			_ = tools.ReflectResponse(res[0], reply)
+		}()
+		if err := <-errChan; err != nil {
+			return *common.NewErrorWithAttachment(err, attachment)
+		}
 	} else {
 		ctx := in[0].Interface().(context.Context)
 		interfaceKey := ctx.Value(constant.InterfaceKey).(string)

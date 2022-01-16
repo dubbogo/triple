@@ -20,6 +20,7 @@ package triple
 import (
 	"context"
 	"reflect"
+	"time"
 )
 
 import (
@@ -33,7 +34,7 @@ import (
 // TripleConn is the struct that called in pb.go file
 // Its client field contains all net logic of dubbo3
 type TripleConn struct {
-	client   *TripleClient
+	timeout  int
 	grpcConn *grpc.ClientConn
 }
 
@@ -41,6 +42,8 @@ type TripleConn struct {
 // @method is /interfaceKey/functionName e.g. /com.apache.dubbo.sample.basic.IGreeter/BigUnaryTest
 // @arg is request body, must be proto.Message type
 func (t *TripleConn) Invoke(ctx context.Context, method string, args, reply interface{}, opts ...grpc.CallOption) common.ErrorWithAttachment {
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(t.timeout)*time.Second)
+	defer cancel()
 	trailer, err := t.grpcConn.Invoke(ctx, method, args, reply, opts...)
 	//return t.client.Request(ctx, method, args, reply)
 	atta := make(common.DubboAttachment, len(trailer))
@@ -57,11 +60,14 @@ func (t *TripleConn) NewStream(ctx context.Context, method string, opts ...grpc.
 }
 
 // newTripleConn new a triple conn with given @tripleclient, which contains all net logic
-func newTripleConn(address string, opts ...grpc.DialOption) *TripleConn {
+func newTripleConn(timeout int, address string, opts ...grpc.DialOption) *TripleConn {
 	//grpcConn, _ := grpc.Dial(address,grpc.WithInsecure())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	defer cancel()
 	opts = append(opts, grpc.WithInsecure())
-	grpcConn, _ := grpc.Dial(address, opts...)
+	grpcConn, _ := grpc.DialContext(ctx, address, opts...)
 	return &TripleConn{
+		timeout:  timeout,
 		grpcConn: grpcConn,
 	}
 }
