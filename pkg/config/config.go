@@ -19,7 +19,7 @@ package config
 
 import (
 	"github.com/dubbogo/triple/pkg/common/constant"
-	loggerInteface "github.com/dubbogo/triple/pkg/common/logger"
+	loggerInterface "github.com/dubbogo/triple/pkg/common/logger"
 	"github.com/dubbogo/triple/pkg/common/logger/default_logger"
 )
 
@@ -52,7 +52,7 @@ type Option struct {
 	JaegerUseAgent    bool
 
 	// logger
-	Logger loggerInteface.Logger
+	Logger loggerInterface.Logger
 
 	// NumWorkers is num of gr in ConnectionPool
 	NumWorkers uint32
@@ -156,9 +156,9 @@ func WithHeaderGroup(group string) OptionFunction {
 
 // WithLogger return OptionFunction with target @logger, which must impl triple/pkg/common/logger.Logger
 // the input @logger should be AddCallerSkip(1)
-func WithLogger(logger loggerInteface.Logger) OptionFunction {
+func WithLogger(logger loggerInterface.Logger) OptionFunction {
 	return func(o *Option) {
-		o.Logger = loggerInteface.NewLoggerWrapper(logger)
+		o.Logger = loggerInterface.NewLoggerWrapper(logger)
 	}
 }
 
