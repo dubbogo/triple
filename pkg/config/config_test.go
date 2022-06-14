@@ -71,15 +71,9 @@ func TestOption_SetEmptyFieldDefaultConfig(t *testing.T) {
 	)
 	assert.NotNil(t, opt)
 	assert.Equal(t, uint32(100000), opt.BufferSize)
-	assert.Equal(t, uint32(0), opt.Timeout)
-	opt.Validate()
-	assert.Equal(t, uint32(100000), opt.BufferSize)
 	assert.Equal(t, uint32(constant.DefaultTimeout), opt.Timeout)
 
 	opt = NewTripleOption()
-	assert.Equal(t, uint32(0), opt.BufferSize)
-	assert.Equal(t, uint32(0), opt.Timeout)
-	opt.Validate()
 	assert.Equal(t, uint32(constant.DefaultHttp2ControllerReadBufferSize), opt.BufferSize)
 	assert.Equal(t, uint32(constant.DefaultTimeout), opt.Timeout)
 }
