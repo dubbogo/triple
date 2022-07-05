@@ -31,6 +31,7 @@ import (
 	"github.com/dubbogo/grpc-go/encoding/msgpack"
 	"github.com/dubbogo/grpc-go/encoding/raw_proto"
 	"github.com/dubbogo/grpc-go/encoding/tools"
+	"github.com/dubbogo/grpc-go/encoding/proto_wrapper_api"
 	"github.com/dubbogo/grpc-go/status"
 
 	"github.com/opentracing/opentracing-go"
@@ -175,8 +176,41 @@ func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply inter
 				return *common.NewErrorWithAttachment(status.Errorf(codes.Unimplemented, "TripleClient.Invoke: serialization %s not impl in triple client api.", t.opt.CodecType), attachment)
 			}
 		}
-		return t.triplConn.Invoke(ctx, "/"+interfaceKey+"/"+methodName, reqParams, reply, grpc.ForceCodec(
+
+		argsBytes := make([][]byte, 0, len(reqParams))
+		argsTypes := make([]string, 0, len(reqParams))
+		for _, value := range reqParams {
+			data, err := innerCodec.Marshal(value)
+			if err != nil {
+				return *common.NewErrorWithAttachment(err, nil)
+			}
+			argsBytes = append(argsBytes, data)
+			argsTypes = append(argsTypes, encoding.GetArgType(value))
+		}
+
+		wrapperRequest := &proto_wrapper_api.TripleRequestWrapper{
+			SerializeType: innerCodec.Name(),
+			Args:          argsBytes,
+			ArgTypes:      argsTypes,
+		}
+
+		// Wrap reply with wrapperResponse
+		wrapperReply := &proto_wrapper_api.TripleResponseWrapper{}
+		errWithAtta := t.triplConn.Invoke(ctx, "/"+interfaceKey+"/"+methodName, wrapperRequest, wrapperReply, grpc.ForceCodec(
 			encoding.NewPBWrapperTwoWayCodec(string(t.opt.CodecType), innerCodec, raw_proto.NewProtobufCodec())))
+		
+		// Empty response or error != nil
+		if reply == nil || errWithAtta.GetError() != nil {
+			return errWithAtta
+		}
+
+		// Unwrap reply from wrapperResponse
+		unmarshalErr := innerCodec.Unmarshal(wrapperReply.Data, reply)
+		if unmarshalErr != nil {
+			return *common.NewErrorWithAttachment(status.Errorf(codes.Canceled, "TripleClient.Invoke: Unmarshal serialization %s error %v.", wrapperReply.SerializeType, unmarshalErr), attachment)
+		}
+		
+		return errWithAtta
 	}
 	return *common.NewErrorWithAttachment(nil, attachment)
 }

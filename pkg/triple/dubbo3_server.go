@@ -23,26 +23,22 @@ import (
 	"net"
 	"reflect"
 	"sync"
-)
 
-import (
 	hessian "github.com/apache/dubbo-go-hessian2"
-
 	"github.com/dubbogo/grpc-go"
 	"github.com/dubbogo/grpc-go/encoding"
+
 	hessianGRPCCodec "github.com/dubbogo/grpc-go/encoding/hessian"
 	"github.com/dubbogo/grpc-go/encoding/msgpack"
 	"github.com/dubbogo/grpc-go/encoding/proto_wrapper_api"
 	"github.com/dubbogo/grpc-go/encoding/raw_proto"
+	"github.com/dubbogo/grpc-go/metadata"
 
-	perrors "github.com/pkg/errors"
-)
-
-import (
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
 	"github.com/dubbogo/triple/pkg/config"
 	"github.com/dubbogo/triple/pkg/tracing"
+	perrors "github.com/pkg/errors"
 )
 
 // TripleServer is the object that can be started and listening remote request
@@ -154,43 +150,110 @@ func (h *GenericCodec) UnmarshalRequest(data []byte) ([]interface{}, error) {
 }
 
 func createGrpcDesc(serviceName string, service common.TripleUnaryService) *grpc.ServiceDesc {
-	genericCodec := newGenericCodec()
-	return &grpc.ServiceDesc{
+	desc := grpc.ServiceDesc{
 		ServiceName: serviceName,
 		HandlerType: (*common.TripleUnaryService)(nil),
-		Methods: []grpc.MethodDesc{
-			{
-				MethodName: "InvokeWithArgs",
-				Handler: func(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-					methodName := ctx.Value("XXX_TRIPLE_GO_METHOD_NAME").(string)
-					genericPayload, ok := ctx.Value("XXX_TRIPLE_GO_GENERIC_PAYLOAD").([]byte)
-					base := srv.(common.TripleUnaryService)
-					if methodName == "$invoke" && ok {
-						args, err := genericCodec.UnmarshalRequest(genericPayload)
-						if err != nil {
-							return nil, perrors.Errorf("unaryProcessor.processUnaryRPC: generic invoke with request %s unmarshal error = %s", string(genericPayload), err.Error())
-						}
-						return base.InvokeWithArgs(ctx, methodName, args)
-					} else {
-
-						reqParam, ok := service.GetReqParamsInterfaces(methodName)
-						if !ok {
-							return nil, perrors.Errorf("method name %s is not provided by service, please check if correct", methodName)
-						}
-						if e := dec(reqParam); e != nil {
-							return nil, e
-						}
-						args := make([]interface{}, 0, len(reqParam))
-						for _, v := range reqParam {
-							tempParamObj := reflect.ValueOf(v).Elem().Interface()
-							args = append(args, tempParamObj)
-						}
-						return base.InvokeWithArgs(ctx, methodName, args)
-					}
-				},
-			},
-		},
+		Methods: make([]grpc.MethodDesc, 0),
 	}
+
+	methods := service.GetServiceMethods()
+	for _, methodName := range methods {
+		desc.Methods = append(desc.Methods, grpc.MethodDesc {
+			MethodName : methodName,
+			Handler : newMethodHandler(service, methodName),
+		})
+	}
+	
+	return &desc
+}
+
+func newMethodHandler(service common.TripleUnaryService, methodName string) func(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	genericCodec := newGenericCodec()
+	handler := func(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+		// invoke
+		responseAttachment, _ := ctx.Value("XXX_TRIPLE_GO_RESPONSE_ATTACHMENT").(metadata.MD)
+		genericPayload, ok := ctx.Value("XXX_TRIPLE_GO_GENERIC_PAYLOAD").([]byte)
+		base := srv.(common.TripleUnaryService)
+		if methodName == "$invoke" && ok {
+			args, err := genericCodec.UnmarshalRequest(genericPayload)
+			if err != nil {
+				return nil, perrors.Errorf("unaryProcessor.processUnaryRPC: generic invoke with request %s unmarshal error = %s", string(genericPayload), err.Error())
+			}
+			return base.InvokeWithArgs(ctx, methodName, args)
+		} else {
+			wrapperRequest := proto_wrapper_api.TripleRequestWrapper{}
+
+			if err := dec(&wrapperRequest); err != nil {
+				return nil, err
+			}
+
+			// TODO: abstract get Codec.
+			var innerCodec encoding.Codec
+			switch wrapperRequest.SerializeType {
+			case "raw_hessian2":
+				innerCodec = hessianGRPCCodec.NewHessianCodec()
+			case "raw_msgpack":
+				innerCodec = msgpack.NewMsgPackCodec()
+			default:
+				innerCodec, _ = common.GetTripleCodec(constant.CodecType(wrapperRequest.SerializeType))
+			}
+
+			reqParam, ok := service.GetReqParamsInterfaces(methodName)
+			if !ok {
+				return nil, perrors.Errorf("method name %s is not provided by service, please check if correct", methodName)
+			}
+
+			if len(reqParam) != len(wrapperRequest.Args) {
+				return nil, perrors.Errorf("error ,request params len is %d, but exported method has %d", len(wrapperRequest.Args), len(reqParam))
+			}
+
+			for idx, value := range wrapperRequest.Args {
+				if err := innerCodec.Unmarshal(value, reqParam[idx]); err != nil {
+					return nil, err
+				}
+			}
+
+			args := make([]interface{}, 0, len(reqParam))
+			for _, v := range reqParam {
+				tempParamObj := reflect.ValueOf(v).Elem().Interface()
+				args = append(args, tempParamObj)
+			}
+			
+			// Get local invoke rawReplyStruct
+			reply, replyerr := base.InvokeWithArgs(ctx, methodName, args)
+
+			// Prepare out attachments
+			var rawReplyStruct interface{}
+			if result, ok := reply.(grpc.OuterResult); ok {
+				outerAttachment := result.Attachments()
+				for k, v := range outerAttachment {
+					if str, ok := v.(string); ok {
+						responseAttachment[k] = []string{str}
+					} else if strs, ok := v.([]string); ok {
+						responseAttachment[k] = strs
+					}
+					// todo deal with unsupported attachment
+				}
+				rawReplyStruct = result.Result()
+			}
+
+			// Wrap reply with TripleResponseWrapper
+			data, err := innerCodec.Marshal(rawReplyStruct)
+			if err != nil {
+				return nil, err
+			}
+		
+			wrapperResp := &proto_wrapper_api.TripleResponseWrapper{
+				SerializeType: wrapperRequest.SerializeType,
+				Data:          data,
+				Type:          encoding.GetArgType(rawReplyStruct),
+			}
+			// wrap reply with wrapperResponse
+			return wrapperResp, replyerr
+		}
+	}
+
+	return handler
 }
 
 func newGrpcServerWithCodec(opt *config.Option) *grpc.Server {
