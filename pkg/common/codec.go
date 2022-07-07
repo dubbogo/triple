@@ -54,15 +54,6 @@ func GetCodecInWrapperName(name constant.CodecType) string {
 	return string(name)
 }
 
-// TwoWayCodec is directly used by triple network logic
-// It can specify the marshal and unmarshal logic of req and rsp
-type TwoWayCodec interface {
-	MarshalRequest(interface{}) ([]byte, error)
-	MarshalResponse(interface{}) ([]byte, error)
-	UnmarshalRequest(data []byte, v interface{}) error
-	UnmarshalResponse(data []byte, v interface{}) error
-}
-
 type GenericCodec interface {
 	UnmarshalRequest(data []byte) ([]interface{}, error)
 }
