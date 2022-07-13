@@ -6,13 +6,14 @@ import (
 
 import (
 	"github.com/dubbogo/grpc-go/encoding"
-	"github.com/dubbogo/grpc-go/encoding/raw_proto"
 
 	perrors "github.com/pkg/errors"
 )
 
 import (
 	"github.com/dubbogo/triple/pkg/common/constant"
+	"github.com/dubbogo/triple/pkg/common/encoding"
+	"github.com/dubbogo/triple/pkg/common/encoding/raw_proto"
 	"github.com/dubbogo/triple/pkg/config"
 )
 
@@ -27,7 +28,7 @@ var codecInWrapperSerializerTypeMap = make(map[string]string)
 
 // SetTripleCodec register CodecFactory @f and CodecType @codecType, with @opt[0].SerializerTypeInWrapper
 func SetTripleCodec(codecType constant.CodecType, f CodecFactory, opt ...*config.Option) {
-	encoding.RegisterCodec(encoding.NewPBWrapperTwoWayCodec(string(codecType), f(), raw_proto.NewProtobufCodec()))
+	encoding.RegisterCodec(pbwrapper.NewPBWrapperTwoWayCodec(string(codecType), f(), raw_proto.NewProtobufCodec()))
 	codecFactoryMap[string(codecType)] = f
 	if len(opt) == 0 {
 		return

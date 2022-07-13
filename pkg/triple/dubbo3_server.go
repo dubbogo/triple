@@ -20,6 +20,7 @@ package triple
 import (
 	"context"
 	"fmt"
+	"github.com/dubbogo/triple/pkg/common/encoding/javaType"
 	"net"
 	"reflect"
 	"sync"
@@ -28,16 +29,18 @@ import (
 	"github.com/dubbogo/grpc-go"
 	"github.com/dubbogo/grpc-go/encoding"
 
-	hessianGRPCCodec "github.com/dubbogo/grpc-go/encoding/hessian"
-	"github.com/dubbogo/grpc-go/encoding/msgpack"
-	"github.com/dubbogo/grpc-go/encoding/proto_wrapper_api"
-	"github.com/dubbogo/grpc-go/encoding/raw_proto"
 	"github.com/dubbogo/grpc-go/metadata"
 
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
+	"github.com/dubbogo/triple/pkg/common/encoding"
+	hessianGRPCCodec "github.com/dubbogo/triple/pkg/common/encoding/hessian"
+	"github.com/dubbogo/triple/pkg/common/encoding/msgpack"
+	"github.com/dubbogo/triple/pkg/common/encoding/proto_wrapper_api"
+	"github.com/dubbogo/triple/pkg/common/encoding/raw_proto"
 	"github.com/dubbogo/triple/pkg/config"
 	"github.com/dubbogo/triple/pkg/tracing"
+
 	perrors "github.com/pkg/errors"
 )
 
@@ -153,17 +156,17 @@ func createGrpcDesc(serviceName string, service common.TripleUnaryService) *grpc
 	desc := grpc.ServiceDesc{
 		ServiceName: serviceName,
 		HandlerType: (*common.TripleUnaryService)(nil),
-		Methods: make([]grpc.MethodDesc, 0),
+		Methods:     make([]grpc.MethodDesc, 0),
 	}
 
 	methods := service.GetServiceMethods()
 	for _, methodName := range methods {
-		desc.Methods = append(desc.Methods, grpc.MethodDesc {
-			MethodName : methodName,
-			Handler : newMethodHandler(service, methodName),
+		desc.Methods = append(desc.Methods, grpc.MethodDesc{
+			MethodName: methodName,
+			Handler:    newMethodHandler(service, methodName),
 		})
 	}
-	
+
 	return &desc
 }
 
@@ -218,7 +221,7 @@ func newMethodHandler(service common.TripleUnaryService, methodName string) func
 				tempParamObj := reflect.ValueOf(v).Elem().Interface()
 				args = append(args, tempParamObj)
 			}
-			
+
 			// Get local invoke rawReplyStruct
 			reply, replyerr := base.InvokeWithArgs(ctx, methodName, args)
 
@@ -242,11 +245,11 @@ func newMethodHandler(service common.TripleUnaryService, methodName string) func
 			if err != nil {
 				return nil, err
 			}
-		
+
 			wrapperResp := &proto_wrapper_api.TripleResponseWrapper{
 				SerializeType: wrapperRequest.SerializeType,
 				Data:          data,
-				Type:          encoding.GetArgType(rawReplyStruct),
+				Type:          javaType.GetArgType(rawReplyStruct),
 			}
 			// wrap reply with wrapperResponse
 			return wrapperResp, replyerr
@@ -293,7 +296,7 @@ func newGrpcServerWithCodec(opt *config.Option) *grpc.Server {
 			fmt.Printf("TripleServer.Start: serialization %s not supported", opt.CodecType)
 		}
 	}
-	serverOpts = append(serverOpts, grpc.ForceServerCodec(encoding.NewPBWrapperTwoWayCodec(string(opt.CodecType), innerCodec, raw_proto.NewProtobufCodec())))
+	serverOpts = append(serverOpts, grpc.ForceServerCodec(pbwrapper.NewPBWrapperTwoWayCodec(string(opt.CodecType), innerCodec, raw_proto.NewProtobufCodec())))
 
 	return grpc.NewServer(serverOpts...)
 }

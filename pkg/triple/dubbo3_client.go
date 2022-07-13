@@ -19,6 +19,8 @@ package triple
 
 import (
 	"context"
+	"github.com/dubbogo/triple/pkg/common/encoding/javaType"
+	"github.com/dubbogo/triple/pkg/common/encoding/raw_proto"
 	"reflect"
 	"sync"
 )
@@ -27,11 +29,6 @@ import (
 	"github.com/dubbogo/grpc-go"
 	"github.com/dubbogo/grpc-go/codes"
 	"github.com/dubbogo/grpc-go/encoding"
-	"github.com/dubbogo/grpc-go/encoding/hessian"
-	"github.com/dubbogo/grpc-go/encoding/msgpack"
-	"github.com/dubbogo/grpc-go/encoding/raw_proto"
-	"github.com/dubbogo/grpc-go/encoding/tools"
-	"github.com/dubbogo/grpc-go/encoding/proto_wrapper_api"
 	"github.com/dubbogo/grpc-go/status"
 
 	"github.com/opentracing/opentracing-go"
@@ -42,6 +39,11 @@ import (
 import (
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
+	"github.com/dubbogo/triple/pkg/common/encoding"
+	"github.com/dubbogo/triple/pkg/common/encoding/hessian"
+	"github.com/dubbogo/triple/pkg/common/encoding/msgpack"
+	"github.com/dubbogo/triple/pkg/common/encoding/proto_wrapper_api"
+	"github.com/dubbogo/triple/pkg/common/encoding/tools"
 	"github.com/dubbogo/triple/pkg/config"
 	"github.com/dubbogo/triple/pkg/tracing"
 )
@@ -185,7 +187,7 @@ func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply inter
 				return *common.NewErrorWithAttachment(err, nil)
 			}
 			argsBytes = append(argsBytes, data)
-			argsTypes = append(argsTypes, encoding.GetArgType(value))
+			argsTypes = append(argsTypes, javaType.GetArgType(value))
 		}
 
 		wrapperRequest := &proto_wrapper_api.TripleRequestWrapper{
@@ -197,8 +199,8 @@ func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply inter
 		// Wrap reply with wrapperResponse
 		wrapperReply := &proto_wrapper_api.TripleResponseWrapper{}
 		errWithAtta := t.triplConn.Invoke(ctx, "/"+interfaceKey+"/"+methodName, wrapperRequest, wrapperReply, grpc.ForceCodec(
-			encoding.NewPBWrapperTwoWayCodec(string(t.opt.CodecType), innerCodec, raw_proto.NewProtobufCodec())))
-		
+			pbwrapper.NewPBWrapperTwoWayCodec(string(t.opt.CodecType), innerCodec, raw_proto.NewProtobufCodec())))
+
 		// Empty response or error != nil
 		if reply == nil || errWithAtta.GetError() != nil {
 			return errWithAtta
@@ -209,7 +211,7 @@ func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply inter
 		if unmarshalErr != nil {
 			return *common.NewErrorWithAttachment(status.Errorf(codes.Canceled, "TripleClient.Invoke: Unmarshal serialization %s error %v.", wrapperReply.SerializeType, unmarshalErr), attachment)
 		}
-		
+
 		return errWithAtta
 	}
 	return *common.NewErrorWithAttachment(nil, attachment)

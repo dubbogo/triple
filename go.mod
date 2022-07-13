@@ -13,3 +13,7 @@ require (
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
 	go.uber.org/zap v1.16.0
 )
+
+replace (
+	github.com/dubbogo/grpc-go => ../grpc-go
+)
