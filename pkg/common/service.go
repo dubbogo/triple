@@ -39,7 +39,7 @@ type TripleGrpcReflectService interface {
 type TripleUnaryService interface {
 	InvokeWithArgs(ctx context.Context, methodName string, arguments []interface{}) (interface{}, error)
 	GetReqParamsInterfaces(methodName string) ([]interface{}, bool)
-	GetServiceMethods() ([]string)
+	GetServiceMethods() []string
 }
 
 type DubboAttachment map[string]interface{}
