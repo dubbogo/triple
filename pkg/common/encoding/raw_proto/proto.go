@@ -11,6 +11,7 @@ import (
 // ProtobufCodec is the protobuf impl of Codec interface
 type ProtobufCodec struct{}
 
+// nolint
 func (p *ProtobufCodec) Name() string {
 	return "raw_proto"
 }
@@ -25,6 +26,7 @@ func (p *ProtobufCodec) Unmarshal(data []byte, v interface{}) error {
 	return proto.Unmarshal(data, v.(proto.Message))
 }
 
+// NewProtobufCodec returns new ProtobufCodec
 func NewProtobufCodec() encoding.Codec {
 	return &ProtobufCodec{}
 }

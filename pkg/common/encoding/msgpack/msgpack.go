@@ -17,6 +17,7 @@ func init() {
 // MsgPackCodec is the msgpack impl of common.Codec interface
 type MsgPackCodec struct{}
 
+// nolint
 func (p *MsgPackCodec) Name() string {
 	return "raw_msgpack"
 }

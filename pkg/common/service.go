@@ -57,6 +57,7 @@ type ErrorWithAttachment struct {
 	attachments DubboAttachment
 }
 
+// NewErrorWithAttachment creates a new ErrorWithAttachment
 func NewErrorWithAttachment(err error, attachments DubboAttachment) *ErrorWithAttachment {
 	return &ErrorWithAttachment{
 		err:         err,
@@ -64,14 +65,17 @@ func NewErrorWithAttachment(err error, attachments DubboAttachment) *ErrorWithAt
 	}
 }
 
+// GetAttachments gets all attachments
 func (e *ErrorWithAttachment) GetAttachments() DubboAttachment {
 	return e.attachments
 }
 
+// GetError gets error from ErrorWithAttachment
 func (e *ErrorWithAttachment) GetError() error {
 	return e.err
 }
 
+// Error returns error string
 func (e *ErrorWithAttachment) Error() string {
 	return e.err.Error()
 }
