@@ -37,7 +37,7 @@ import (
 	"github.com/dubbogo/triple/pkg/common/constant"
 	"github.com/dubbogo/triple/pkg/common/encoding"
 	"github.com/dubbogo/triple/pkg/common/encoding/hessian"
-	"github.com/dubbogo/triple/pkg/common/encoding/javaType"
+	"github.com/dubbogo/triple/pkg/common/encoding/java_type"
 	"github.com/dubbogo/triple/pkg/common/encoding/msgpack"
 	"github.com/dubbogo/triple/pkg/common/encoding/proto_wrapper_api"
 	"github.com/dubbogo/triple/pkg/common/encoding/raw_proto"
@@ -185,7 +185,7 @@ func (t *TripleClient) Invoke(methodName string, in []reflect.Value, reply inter
 				return *common.NewErrorWithAttachment(err, nil)
 			}
 			argsBytes = append(argsBytes, data)
-			argsTypes = append(argsTypes, javaType.GetArgType(value))
+			argsTypes = append(argsTypes, java_type.GetArgType(value))
 		}
 
 		wrapperRequest := &proto_wrapper_api.TripleRequestWrapper{

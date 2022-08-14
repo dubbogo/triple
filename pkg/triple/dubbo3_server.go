@@ -38,7 +38,7 @@ import (
 	"github.com/dubbogo/triple/pkg/common/constant"
 	"github.com/dubbogo/triple/pkg/common/encoding"
 	hessianGRPCCodec "github.com/dubbogo/triple/pkg/common/encoding/hessian"
-	"github.com/dubbogo/triple/pkg/common/encoding/javaType"
+	"github.com/dubbogo/triple/pkg/common/encoding/java_type"
 	"github.com/dubbogo/triple/pkg/common/encoding/msgpack"
 	"github.com/dubbogo/triple/pkg/common/encoding/proto_wrapper_api"
 	"github.com/dubbogo/triple/pkg/common/encoding/raw_proto"
@@ -251,7 +251,7 @@ func newMethodHandler(service common.TripleUnaryService, methodName string) func
 			wrapperResp := &proto_wrapper_api.TripleResponseWrapper{
 				SerializeType: wrapperRequest.SerializeType,
 				Data:          data,
-				Type:          javaType.GetArgType(rawReplyStruct),
+				Type:          java_type.GetArgType(rawReplyStruct),
 			}
 			// wrap reply with wrapperResponse
 			return wrapperResp, replyerr
