@@ -22,7 +22,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"github.com/dubbogo/grpc-go/credentials"
 	"io/ioutil"
 	"reflect"
 	"sync"
@@ -31,6 +30,7 @@ import (
 import (
 	"github.com/dubbogo/grpc-go"
 	"github.com/dubbogo/grpc-go/codes"
+	"github.com/dubbogo/grpc-go/credentials"
 	"github.com/dubbogo/grpc-go/encoding"
 	"github.com/dubbogo/grpc-go/encoding/hessian"
 	"github.com/dubbogo/grpc-go/encoding/msgpack"
