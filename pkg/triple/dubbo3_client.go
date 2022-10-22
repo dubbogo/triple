@@ -94,9 +94,9 @@ func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error
 
 	if creds, err := getClientTlsCertificate(opt); err != nil {
 		if err != nil {
-			fmt.Printf("TripleServer.Start: TLS config err: %v", err)
+			fmt.Printf("TripleClient.Start: TLS config err: %v", err)
 		}
-	} else {
+	} else if creds != nil {
 		dialOpts = append(dialOpts, grpc.WithTransportCredentials(creds))
 	}
 

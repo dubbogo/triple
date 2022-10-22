@@ -221,12 +221,12 @@ func newGrpcServerWithCodec(opt *config.Option) *grpc.Server {
 		serverOpts = append(serverOpts, grpc.ProxyModeEnable(true))
 	}
 	//TLS config
-	if tlsConfig, err := getServerTlsConfig(opt); err != nil {
+	if creds, err := getServerTlsCertificate(opt); err != nil {
 		if err != nil {
 			fmt.Printf("TripleServer.Start: TLS config err: %v", err)
 		}
-	} else {
-		serverOpts = append(serverOpts, grpc.Creds(credentials.NewTLS(tlsConfig)))
+	} else if creds != nil {
+		serverOpts = append(serverOpts, grpc.Creds(creds))
 	}
 
 	var err error
@@ -303,12 +303,13 @@ func (t *TripleServer) RefreshService() {
 	t.lst = lst
 }
 
-func getServerTlsConfig(opt *config.Option) (*tls.Config, error) {
+func getServerTlsCertificate(opt *config.Option) (credentials.TransportCredentials, error) {
 	//no TLS
 	if opt.TLSCertFile == "" && opt.TLSKeyFile == "" {
 		return nil, nil
 	}
 	var ca *x509.CertPool
+	cfg := &tls.Config{}
 	//need mTLS
 	if opt.CACertFile != "" {
 		ca = x509.NewCertPool()
@@ -319,14 +320,15 @@ func getServerTlsConfig(opt *config.Option) (*tls.Config, error) {
 		if ok := ca.AppendCertsFromPEM(caBytes); !ok {
 			return nil, err
 		}
+		cfg.ClientAuth = tls.RequireAndVerifyClientCert
+		cfg.ClientCAs = ca
 	}
 	cert, err := tls.LoadX509KeyPair(opt.TLSCertFile, opt.TLSKeyFile)
 	if err != nil {
 		return nil, err
 	}
-	return &tls.Config{
-		ServerName:   opt.TLSServerName,
-		Certificates: []tls.Certificate{cert},
-		RootCAs:      ca,
-	}, nil
+	cfg.Certificates = []tls.Certificate{cert}
+	cfg.ServerName = opt.TLSServerName
+
+	return credentials.NewTLS(cfg), nil
 }
