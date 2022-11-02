@@ -28,7 +28,7 @@ const (
 	DefaultHttp2ControllerReadBufferSize = 4096
 
 	// DefaultTimeout is default timeout seconds of triple client
-	DefaultTimeout = time.Second * 15
+	DefaultTimeout = time.Second * 3
 
 	// DefaultListeningAddress is default listening address
 	DefaultListeningAddress = "127.0.0.1:20001"
