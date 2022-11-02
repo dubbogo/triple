@@ -100,9 +100,9 @@ func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error
 	// codec
 	if opt.CodecType == constant.PBCodecName {
 		// put dubbo3 network logic to tripleConn, creat pb stub invoker
-		tripleClient.stubInvoker = reflect.ValueOf(getInvoker(impl, newTripleConn(int(opt.Timeout), opt.Location, dialOpts...)))
+		tripleClient.stubInvoker = reflect.ValueOf(getInvoker(impl, newTripleConn(opt.Timeout, opt.Location, dialOpts...)))
 	} else {
-		tripleClient.triplConn = newTripleConn(int(opt.Timeout), opt.Location, dialOpts...)
+		tripleClient.triplConn = newTripleConn(opt.Timeout, opt.Location, dialOpts...)
 	}
 	return tripleClient, nil
 }

@@ -19,8 +19,8 @@ package config
 
 import (
 	"testing"
+	"time"
 )
-
 import (
 	"github.com/stretchr/testify/assert"
 )
@@ -40,7 +40,7 @@ func TestWithClientTimeout(t *testing.T) {
 		WithClientTimeout(120),
 	)
 	assert.NotNil(t, opt)
-	assert.Equal(t, opt.Timeout, uint32(120))
+	assert.Equal(t, opt.Timeout, time.Duration(120))
 }
 
 func TestWithSerializerType(t *testing.T) {
@@ -71,11 +71,11 @@ func TestOption_SetEmptyFieldDefaultConfig(t *testing.T) {
 	)
 	assert.NotNil(t, opt)
 	assert.Equal(t, uint32(100000), opt.BufferSize)
-	assert.Equal(t, uint32(constant.DefaultTimeout), opt.Timeout)
+	assert.Equal(t, constant.DefaultTimeout, opt.Timeout)
 
 	opt = NewTripleOption()
 	assert.Equal(t, uint32(constant.DefaultHttp2ControllerReadBufferSize), opt.BufferSize)
-	assert.Equal(t, uint32(constant.DefaultTimeout), opt.Timeout)
+	assert.Equal(t, constant.DefaultTimeout, opt.Timeout)
 }
 
 func TestWithHeaderAppVersion(t *testing.T) {
@@ -105,7 +105,7 @@ func TestWithLogger(t *testing.T) {
 func TestValidate(t *testing.T) {
 	opt := NewTripleOption()
 	opt.Validate()
-	assert.Equal(t, uint32(constant.DefaultTimeout), opt.Timeout)
+	assert.Equal(t, constant.DefaultTimeout, opt.Timeout)
 	assert.Equal(t, uint32(constant.DefaultHttp2ControllerReadBufferSize), opt.BufferSize)
 	assert.Equal(t, constant.DefaultListeningAddress, opt.Location)
 	assert.Equal(t, constant.TRIPLE, opt.Protocol)

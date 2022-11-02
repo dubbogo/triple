@@ -18,6 +18,8 @@
 package config
 
 import (
+	"time"
+
 	"github.com/dubbogo/triple/pkg/common/constant"
 	loggerInterface "github.com/dubbogo/triple/pkg/common/logger"
 	"github.com/dubbogo/triple/pkg/common/logger/default_logger"
@@ -26,7 +28,7 @@ import (
 // triple option
 type Option struct {
 	// network opts
-	Timeout    uint32
+	Timeout    time.Duration
 	BufferSize uint32
 
 	// service opts
@@ -63,8 +65,8 @@ type Option struct {
 
 // Validate sets empty field to default config
 func (o *Option) Validate() {
-	if o.Timeout == uint32(0) {
-		o.Timeout = uint32(constant.DefaultTimeout)
+	if o.Timeout == time.Duration(0) {
+		o.Timeout = constant.DefaultTimeout
 	}
 
 	if o.BufferSize == uint32(0) {
@@ -106,7 +108,7 @@ func NewTripleOption(fs ...OptionFunction) *Option {
 }
 
 // WithClientTimeout return OptionFunction with timeout of @timeout
-func WithClientTimeout(timeout uint32) OptionFunction {
+func WithClientTimeout(timeout time.Duration) OptionFunction {
 	return func(o *Option) {
 		o.Timeout = timeout
 	}
