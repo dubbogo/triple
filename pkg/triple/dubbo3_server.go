@@ -19,7 +19,10 @@ package triple
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"reflect"
 	"sync"
@@ -36,6 +39,8 @@ import (
 	"github.com/dubbogo/grpc-go/encoding/raw_proto"
 
 	perrors "github.com/pkg/errors"
+
+	"github.com/dubbogo/grpc-go/credentials"
 )
 
 import (
@@ -215,6 +220,14 @@ func newGrpcServerWithCodec(opt *config.Option) *grpc.Server {
 	if opt.ProxyModeEnable {
 		serverOpts = append(serverOpts, grpc.ProxyModeEnable(true))
 	}
+	// TLS config
+	if creds, err := getServerTlsCertificate(opt); err != nil {
+		if err != nil {
+			opt.Logger.Errorf("TripleClient.Start: TLS config err: %v", err)
+		}
+	} else if creds != nil {
+		serverOpts = append(serverOpts, grpc.Creds(creds))
+	}
 
 	var err error
 	switch opt.CodecType {
@@ -288,4 +301,34 @@ func (t *TripleServer) RefreshService() {
 	go grpcServer.Serve(lst)
 	t.grpcServer = grpcServer
 	t.lst = lst
+}
+
+func getServerTlsCertificate(opt *config.Option) (credentials.TransportCredentials, error) {
+	// no TLS
+	if opt.TLSCertFile == "" && opt.TLSKeyFile == "" {
+		return nil, nil
+	}
+	var ca *x509.CertPool
+	cfg := &tls.Config{}
+	// need mTLS
+	if opt.CACertFile != "" {
+		ca = x509.NewCertPool()
+		caBytes, err := ioutil.ReadFile(opt.CACertFile)
+		if err != nil {
+			return nil, err
+		}
+		if ok := ca.AppendCertsFromPEM(caBytes); !ok {
+			return nil, err
+		}
+		cfg.ClientAuth = tls.RequireAndVerifyClientCert
+		cfg.ClientCAs = ca
+	}
+	cert, err := tls.LoadX509KeyPair(opt.TLSCertFile, opt.TLSKeyFile)
+	if err != nil {
+		return nil, err
+	}
+	cfg.Certificates = []tls.Certificate{cert}
+	cfg.ServerName = opt.TLSServerName
+
+	return credentials.NewTLS(cfg), nil
 }

@@ -61,6 +61,12 @@ type Option struct {
 
 	// proxy mode for gateway
 	ProxyModeEnable bool
+
+	//tls
+	CACertFile    string
+	TLSCertFile   string
+	TLSKeyFile    string
+	TLSServerName string
 }
 
 // Validate sets empty field to default config

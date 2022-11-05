@@ -19,6 +19,9 @@ package triple
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"io/ioutil"
 	"reflect"
 	"sync"
 )
@@ -26,6 +29,7 @@ import (
 import (
 	"github.com/dubbogo/grpc-go"
 	"github.com/dubbogo/grpc-go/codes"
+	"github.com/dubbogo/grpc-go/credentials"
 	"github.com/dubbogo/grpc-go/encoding"
 	"github.com/dubbogo/grpc-go/encoding/hessian"
 	"github.com/dubbogo/grpc-go/encoding/msgpack"
@@ -85,6 +89,13 @@ func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error
 			grpc.WithUnaryInterceptor(tracing.OpenTracingClientInterceptor(tracer)),
 			grpc.WithStreamInterceptor(tracing.OpenTracingStreamClientInterceptor(tracer)),
 		)
+	}
+
+	if creds, err := getClientTlsCertificate(opt); err != nil {
+		opt.Logger.Errorf("TripleClient.Start: TLS config err: %v", err)
+		return nil, err
+	} else if creds != nil {
+		dialOpts = append(dialOpts, grpc.WithTransportCredentials(creds))
 	}
 
 	defaultCallOpts := make([]grpc.CallOption, 0)
@@ -192,4 +203,35 @@ func (t *TripleClient) Close() {
 // IsAvailable returns if triple client is available
 func (t *TripleClient) IsAvailable() bool {
 	return true
+}
+
+func getClientTlsCertificate(opt *config.Option) (credentials.TransportCredentials, error) {
+	// no TLS
+	if opt.TLSCertFile == "" && opt.TLSKeyFile == "" {
+		return nil, nil
+	}
+
+	if opt.CACertFile == "" {
+		return credentials.NewClientTLSFromFile(opt.TLSCertFile, opt.TLSServerName)
+	}
+
+	// need mTLS
+	ca := x509.NewCertPool()
+	caBytes, err := ioutil.ReadFile(opt.CACertFile)
+	if err != nil {
+		return nil, err
+	}
+	if ok := ca.AppendCertsFromPEM(caBytes); !ok {
+		return nil, err
+	}
+	cert, err := tls.LoadX509KeyPair(opt.TLSCertFile, opt.TLSKeyFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return credentials.NewTLS(&tls.Config{
+		ServerName:   opt.TLSServerName,
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      ca,
+	}), nil
 }
