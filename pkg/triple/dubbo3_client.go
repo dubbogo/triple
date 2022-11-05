@@ -21,7 +21,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"io/ioutil"
 	"reflect"
 	"sync"
@@ -93,9 +92,8 @@ func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error
 	}
 
 	if creds, err := getClientTlsCertificate(opt); err != nil {
-		if err != nil {
-			fmt.Printf("TripleClient.Start: TLS config err: %v", err)
-		}
+		opt.Logger.Errorf("TripleClient.Start: TLS config err: %v", err)
+		return nil, err
 	} else if creds != nil {
 		dialOpts = append(dialOpts, grpc.WithTransportCredentials(creds))
 	}
@@ -208,7 +206,7 @@ func (t *TripleClient) IsAvailable() bool {
 }
 
 func getClientTlsCertificate(opt *config.Option) (credentials.TransportCredentials, error) {
-	//no TLS
+	// no TLS
 	if opt.TLSCertFile == "" && opt.TLSKeyFile == "" {
 		return nil, nil
 	}
@@ -217,7 +215,7 @@ func getClientTlsCertificate(opt *config.Option) (credentials.TransportCredentia
 		return credentials.NewClientTLSFromFile(opt.TLSCertFile, opt.TLSServerName)
 	}
 
-	//need mTLS
+	// need mTLS
 	ca := x509.NewCertPool()
 	caBytes, err := ioutil.ReadFile(opt.CACertFile)
 	if err != nil {

@@ -220,10 +220,10 @@ func newGrpcServerWithCodec(opt *config.Option) *grpc.Server {
 	if opt.ProxyModeEnable {
 		serverOpts = append(serverOpts, grpc.ProxyModeEnable(true))
 	}
-	//TLS config
+	// TLS config
 	if creds, err := getServerTlsCertificate(opt); err != nil {
 		if err != nil {
-			fmt.Printf("TripleServer.Start: TLS config err: %v", err)
+			opt.Logger.Errorf("TripleClient.Start: TLS config err: %v", err)
 		}
 	} else if creds != nil {
 		serverOpts = append(serverOpts, grpc.Creds(creds))
@@ -304,13 +304,13 @@ func (t *TripleServer) RefreshService() {
 }
 
 func getServerTlsCertificate(opt *config.Option) (credentials.TransportCredentials, error) {
-	//no TLS
+	// no TLS
 	if opt.TLSCertFile == "" && opt.TLSKeyFile == "" {
 		return nil, nil
 	}
 	var ca *x509.CertPool
 	cfg := &tls.Config{}
-	//need mTLS
+	// need mTLS
 	if opt.CACertFile != "" {
 		ca = x509.NewCertPool()
 		caBytes, err := ioutil.ReadFile(opt.CACertFile)
