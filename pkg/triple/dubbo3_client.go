@@ -30,6 +30,7 @@ import (
 	"github.com/dubbogo/grpc-go"
 	"github.com/dubbogo/grpc-go/codes"
 	"github.com/dubbogo/grpc-go/credentials"
+	"github.com/dubbogo/grpc-go/credentials/insecure"
 	"github.com/dubbogo/grpc-go/encoding"
 	"github.com/dubbogo/grpc-go/encoding/hessian"
 	"github.com/dubbogo/grpc-go/encoding/msgpack"
@@ -96,6 +97,8 @@ func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error
 		return nil, err
 	} else if creds != nil {
 		dialOpts = append(dialOpts, grpc.WithTransportCredentials(creds))
+	} else {
+		dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
 
 	defaultCallOpts := make([]grpc.CallOption, 0)
