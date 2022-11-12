@@ -17,6 +17,8 @@
 
 package constant
 
+import "time"
+
 // transfer
 const (
 	// TRIPLE is triple protocol name
@@ -26,7 +28,7 @@ const (
 	DefaultHttp2ControllerReadBufferSize = 4096
 
 	// DefaultTimeout is default timeout seconds of triple client
-	DefaultTimeout = 15
+	DefaultTimeout = time.Second * 3
 
 	// DefaultListeningAddress is default listening address
 	DefaultListeningAddress = "127.0.0.1:20001"
