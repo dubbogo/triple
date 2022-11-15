@@ -64,7 +64,6 @@ func newTripleConn(timeout time.Duration, address string, opts ...grpc.DialOptio
 	//grpcConn, _ := grpc.Dial(address,grpc.WithInsecure())
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	opts = append(opts, grpc.WithInsecure())
 	grpcConn, _ := grpc.DialContext(ctx, address, opts...)
 	return &TripleConn{
 		timeout:  timeout,

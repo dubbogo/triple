@@ -32,6 +32,7 @@ import (
 	hessian "github.com/apache/dubbo-go-hessian2"
 
 	"github.com/dubbogo/grpc-go"
+	"github.com/dubbogo/grpc-go/credentials/insecure"
 	"github.com/dubbogo/grpc-go/encoding"
 	hessianGRPCCodec "github.com/dubbogo/grpc-go/encoding/hessian"
 	"github.com/dubbogo/grpc-go/encoding/msgpack"
@@ -227,6 +228,8 @@ func newGrpcServerWithCodec(opt *config.Option) *grpc.Server {
 		}
 	} else if creds != nil {
 		serverOpts = append(serverOpts, grpc.Creds(creds))
+	} else {
+		serverOpts = append(serverOpts, grpc.Creds(insecure.NewCredentials()))
 	}
 
 	var err error
