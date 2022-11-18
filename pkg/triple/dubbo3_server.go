@@ -23,18 +23,21 @@ import (
 	"net"
 	"reflect"
 	"sync"
+)
 
+import (
 	hessian "github.com/apache/dubbo-go-hessian2"
 	"github.com/dubbogo/grpc-go"
 	"github.com/dubbogo/grpc-go/encoding"
 	"github.com/dubbogo/grpc-go/metadata"
+	perrors "github.com/pkg/errors"
+)
 
+import (
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
-	pbwrapper "github.com/dubbogo/triple/pkg/common/encoding"
+	"github.com/dubbogo/triple/pkg/common/encoding"
 	"github.com/dubbogo/triple/pkg/common/logger"
-	perrors "github.com/pkg/errors"
-
 	hessianGRPCCodec "github.com/dubbogo/triple/pkg/common/encoding/hessian"
 	"github.com/dubbogo/triple/pkg/common/encoding/java_type"
 	"github.com/dubbogo/triple/pkg/common/encoding/msgpack"
@@ -240,6 +243,7 @@ func newMethodHandler(service common.TripleUnaryService, methodName string) func
 						responseAttachment[k] = strs
 					}
 					// todo deal with unsupported attachment
+					log.Warnf("The attachment %v is unsupported now!", v)
 				}
 				rawReplyStruct = result.Result()
 			}
