@@ -23,20 +23,18 @@ import (
 	"net"
 	"reflect"
 	"sync"
-)
 
-import (
 	hessian "github.com/apache/dubbo-go-hessian2"
 	"github.com/dubbogo/grpc-go"
 	"github.com/dubbogo/grpc-go/encoding"
 	"github.com/dubbogo/grpc-go/metadata"
-	perrors "github.com/pkg/errors"
-)
 
-import (
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
-	"github.com/dubbogo/triple/pkg/common/encoding"
+	pbwrapper "github.com/dubbogo/triple/pkg/common/encoding"
+	"github.com/dubbogo/triple/pkg/common/logger"
+	perrors "github.com/pkg/errors"
+
 	hessianGRPCCodec "github.com/dubbogo/triple/pkg/common/encoding/hessian"
 	"github.com/dubbogo/triple/pkg/common/encoding/java_type"
 	"github.com/dubbogo/triple/pkg/common/encoding/msgpack"
@@ -44,6 +42,10 @@ import (
 	"github.com/dubbogo/triple/pkg/common/encoding/raw_proto"
 	"github.com/dubbogo/triple/pkg/config"
 	"github.com/dubbogo/triple/pkg/tracing"
+)
+
+var (
+	log = logger.LoggerWrapper{}
 )
 
 // TripleServer is the object that can be started and listening remote request
