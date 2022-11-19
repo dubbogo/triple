@@ -27,6 +27,7 @@ import (
 
 import (
 	hessian "github.com/apache/dubbo-go-hessian2"
+	"github.com/dubbogo/gost/log/logger"
 	"github.com/dubbogo/grpc-go"
 	"github.com/dubbogo/grpc-go/encoding"
 	"github.com/dubbogo/grpc-go/metadata"
@@ -37,7 +38,6 @@ import (
 	"github.com/dubbogo/triple/pkg/common"
 	"github.com/dubbogo/triple/pkg/common/constant"
 	"github.com/dubbogo/triple/pkg/common/encoding"
-	"github.com/dubbogo/triple/pkg/common/logger"
 	hessianGRPCCodec "github.com/dubbogo/triple/pkg/common/encoding/hessian"
 	"github.com/dubbogo/triple/pkg/common/encoding/java_type"
 	"github.com/dubbogo/triple/pkg/common/encoding/msgpack"
@@ -45,10 +45,6 @@ import (
 	"github.com/dubbogo/triple/pkg/common/encoding/raw_proto"
 	"github.com/dubbogo/triple/pkg/config"
 	"github.com/dubbogo/triple/pkg/tracing"
-)
-
-var (
-	log = logger.LoggerWrapper{}
 )
 
 // TripleServer is the object that can be started and listening remote request
@@ -243,7 +239,7 @@ func newMethodHandler(service common.TripleUnaryService, methodName string) func
 						responseAttachment[k] = strs
 					}
 					// todo deal with unsupported attachment
-					log.Warnf("The attachment %v is unsupported now!", v)
+					logger.Warnf("The attachment %v is unsupported now!", v)
 				}
 				rawReplyStruct = result.Result()
 			}
