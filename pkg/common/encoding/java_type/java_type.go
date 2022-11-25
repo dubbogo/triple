@@ -27,6 +27,7 @@ import (
 )
 
 // GetArgType is copied from hessian, to get java class type of interface
+// Note: triple's GetArgType is different from hessian's getArgType, more details in https://github.com/dubbogo/grpc-go/pull/1
 func GetArgType(v interface{}) string {
 	if v == nil {
 		return "V"
