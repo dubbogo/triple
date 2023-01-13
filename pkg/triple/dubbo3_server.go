@@ -27,6 +27,7 @@ import (
 
 import (
 	hessian "github.com/apache/dubbo-go-hessian2"
+	"github.com/dubbogo/gost/log/logger"
 	"github.com/dubbogo/grpc-go"
 	"github.com/dubbogo/grpc-go/encoding"
 	"github.com/dubbogo/grpc-go/metadata"
@@ -238,6 +239,7 @@ func newMethodHandler(service common.TripleUnaryService, methodName string) func
 						responseAttachment[k] = strs
 					}
 					// todo deal with unsupported attachment
+					logger.Warnf("The attachment %v is unsupported now!", v)
 				}
 				rawReplyStruct = result.Result()
 			}
