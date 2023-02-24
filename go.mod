@@ -4,7 +4,7 @@ go 1.15
 
 require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
-	github.com/apache/dubbo-go-hessian2 v1.11.5
+	github.com/apache/dubbo-go-hessian2 v1.11.6
 	github.com/dubbogo/grpc-go v1.42.9
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/pkg/errors v0.9.1
