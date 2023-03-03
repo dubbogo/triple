@@ -212,10 +212,10 @@ func newGrpcServerWithCodec(opt *config.Option) *grpc.Server {
 	}
 
 	if opt.GRPCMaxServerRecvMsgSize != 0 {
-		serverOpts = append(serverOpts, grpc.MaxRecvMsgSize(opt.GRPCMaxServerSendMsgSize))
+		serverOpts = append(serverOpts, grpc.MaxRecvMsgSize(opt.GRPCMaxServerRecvMsgSize))
 	}
 	if opt.GRPCMaxCallSendMsgSize != 0 {
-		serverOpts = append(serverOpts, grpc.MaxSendMsgSize(opt.GRPCMaxServerRecvMsgSize))
+		serverOpts = append(serverOpts, grpc.MaxSendMsgSize(opt.GRPCMaxCallSendMsgSize))
 	}
 
 	if opt.ProxyModeEnable {
