@@ -19,7 +19,9 @@ package config
 
 import (
 	"time"
+)
 
+import (
 	"github.com/dubbogo/triple/pkg/common/constant"
 	loggerInterface "github.com/dubbogo/triple/pkg/common/logger"
 	"github.com/dubbogo/triple/pkg/common/logger/default_logger"
@@ -47,6 +49,8 @@ type Option struct {
 	GRPCMaxServerSendMsgSize int
 	GRPCMaxCallRecvMsgSize   int
 	GRPCMaxServerRecvMsgSize int
+	GRPCKeepAliveTime        time.Duration
+	GRPCKeepAliveTimeout     time.Duration
 
 	// tracing
 	JaegerAddress     string
@@ -204,6 +208,18 @@ func WithGRPCMaxServerSendMessageSize(maxServerSendMsgSize int) OptionFunction {
 func WithGRPCMaxServerRecvMessageSize(maxServerRecvMsgSize int) OptionFunction {
 	return func(o *Option) {
 		o.GRPCMaxServerRecvMsgSize = maxServerRecvMsgSize
+	}
+}
+
+func WithGRPCKeepAliveTimeInterval(keepAliveInterval time.Duration) OptionFunction {
+	return func(o *Option) {
+		o.GRPCKeepAliveTime = keepAliveInterval
+	}
+}
+
+func WithGRPCKeepAliveTimeout(keepAliveTimeout time.Duration) OptionFunction {
+	return func(o *Option) {
+		o.GRPCKeepAliveTimeout = keepAliveTimeout
 	}
 }
 
