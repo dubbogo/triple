@@ -32,6 +32,7 @@ import (
 	hessian "github.com/apache/dubbo-go-hessian2"
 
 	"github.com/dubbogo/grpc-go"
+	"github.com/dubbogo/grpc-go/credentials"
 	"github.com/dubbogo/grpc-go/credentials/insecure"
 	"github.com/dubbogo/grpc-go/encoding"
 	hessianGRPCCodec "github.com/dubbogo/grpc-go/encoding/hessian"
@@ -40,8 +41,6 @@ import (
 	"github.com/dubbogo/grpc-go/encoding/raw_proto"
 
 	perrors "github.com/pkg/errors"
-
-	"github.com/dubbogo/grpc-go/credentials"
 )
 
 import (

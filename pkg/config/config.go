@@ -19,7 +19,9 @@ package config
 
 import (
 	"time"
+)
 
+import (
 	"github.com/dubbogo/triple/pkg/common/constant"
 	loggerInterface "github.com/dubbogo/triple/pkg/common/logger"
 	"github.com/dubbogo/triple/pkg/common/logger/default_logger"
