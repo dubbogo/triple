@@ -47,6 +47,8 @@ type Option struct {
 	GRPCMaxServerSendMsgSize int
 	GRPCMaxCallRecvMsgSize   int
 	GRPCMaxServerRecvMsgSize int
+	GRPCKeepAliveTime        time.Duration
+	GRPCKeepAliveTimeout     time.Duration
 
 	// tracing
 	JaegerAddress     string
@@ -204,6 +206,18 @@ func WithGRPCMaxServerSendMessageSize(maxServerSendMsgSize int) OptionFunction {
 func WithGRPCMaxServerRecvMessageSize(maxServerRecvMsgSize int) OptionFunction {
 	return func(o *Option) {
 		o.GRPCMaxServerRecvMsgSize = maxServerRecvMsgSize
+	}
+}
+
+func WithGRPCKeepAliveTimeInterval(keepAliveInterval time.Duration) OptionFunction {
+	return func(o *Option) {
+		o.GRPCKeepAliveTime = keepAliveInterval
+	}
+}
+
+func WithGRPCKeepAliveTimeout(keepAliveTimeout time.Duration) OptionFunction {
+	return func(o *Option) {
+		o.GRPCKeepAliveTimeout = keepAliveTimeout
 	}
 }
 
