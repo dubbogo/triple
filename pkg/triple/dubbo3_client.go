@@ -36,6 +36,7 @@ import (
 	"github.com/dubbogo/grpc-go/encoding/msgpack"
 	"github.com/dubbogo/grpc-go/encoding/raw_proto"
 	"github.com/dubbogo/grpc-go/encoding/tools"
+	"github.com/dubbogo/grpc-go/keepalive"
 	"github.com/dubbogo/grpc-go/status"
 
 	"github.com/opentracing/opentracing-go"
@@ -110,6 +111,14 @@ func NewTripleClient(impl interface{}, opt *config.Option) (*TripleClient, error
 		defaultCallOpts = append(defaultCallOpts, grpc.MaxCallRecvMsgSize(opt.GRPCMaxCallRecvMsgSize))
 	}
 	dialOpts = append(dialOpts, grpc.WithDefaultCallOptions(defaultCallOpts...))
+	//keepalive
+	if opt.GRPCKeepAliveTime != 0 && opt.GRPCKeepAliveTimeout != 0 {
+		dialOpts = append(dialOpts, grpc.WithKeepaliveParams(keepalive.ClientParameters{
+			Time:                opt.GRPCKeepAliveTime,
+			Timeout:             opt.GRPCKeepAliveTimeout,
+			PermitWithoutStream: true,
+		}))
+	}
 
 	// codec
 	if opt.CodecType == constant.PBCodecName {
