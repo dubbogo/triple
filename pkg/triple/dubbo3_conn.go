@@ -19,7 +19,9 @@ package triple
 
 import (
 	"context"
+	"google.golang.org/grpc/connectivity"
 	"reflect"
+	"sync"
 	"time"
 )
 
@@ -34,8 +36,12 @@ import (
 // TripleConn is the struct that called in pb.go file
 // Its client field contains all net logic of dubbo3
 type TripleConn struct {
-	timeout  time.Duration
-	grpcConn *grpc.ClientConn
+	timeout   time.Duration
+	grpcConn  *grpc.ClientConn
+	lastUsed  time.Time
+	createdAt time.Time
+	status    connectivity.State
+	onceClose sync.Once
 }
 
 // Invoke called by unary rpc 's pb.go file in dubbo-go 3.0 design
@@ -81,4 +87,8 @@ func getInvoker(impl interface{}, conn *TripleConn) interface{} {
 	// res[0] is a struct that contains SayHello method, res[0] is greeter Client in example
 	// it's SayHello methodwill call specific of conn's invoker.
 	return res[0].Interface()
+}
+
+func (t *TripleConn) GetStatus() connectivity.State {
+	return t.status
 }

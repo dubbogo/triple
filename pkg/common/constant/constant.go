@@ -104,9 +104,19 @@ const (
 const (
 	// DefaultNumWorkers #workers for connection pool
 	DefaultNumWorkers = 720
+
+	DefaultPoolSize = 10
+
+	DefaultidleTimeout = 5 * time.Minute
 )
 
 // proxy interface
 const (
 	ProxyServiceKey = "github.com.dubbogo.triple.proxy"
+)
+
+const (
+	StatusIdle = iota
+	StatusInUse
+	StatusClosed
 )
