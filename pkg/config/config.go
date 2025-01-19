@@ -106,13 +106,6 @@ func (o *Option) Validate() {
 		o.NumWorkers = constant.DefaultNumWorkers
 	}
 
-	if o.PoolSize <= 0 {
-		o.PoolSize = constant.DefaultPoolSize
-	}
-
-	if o.IdleTimeout <= 0 {
-		o.IdleTimeout = constant.DefaultidleTimeout
-	}
 }
 
 // nolint

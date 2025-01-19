@@ -1,148 +1,215 @@
 package triple
 
 import (
+	"context"
+	"fmt"
+	"github.com/dubbogo/grpc-go"
+	"github.com/stretchr/testify/assert"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
 
-import (
-	"github.com/dubbogo/grpc-go"
-	"github.com/stretchr/testify/assert"
-)
-
-// TestConnPool_NewConnPool tests the initialization of the connection pool
-func TestConnPool_NewConnPool(t *testing.T) {
-	dialer := func(address string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
-		if len(opts) == 0 {
-			opts = append(opts, grpc.WithInsecure()) // 这里加上 WithInsecure 选项
-		}
-		conn, err := grpc.Dial(address, opts...)
-		if err != nil {
-			return nil, err
-		}
-		return conn, nil
-	}
-
-	pool := NewConnPool(2, "localhost:50051", dialer)
-
-	assert.Equal(t, 2, len(pool.pool), "expected 2 connections in pool")
-
-	assert.Equal(t, 2, pool.maxPoolSize, "expected maxPoolSize 2")
-
-	assert.Equal(t, 2, pool.currentSize, "expected currentSize 2")
-
-	assert.NotNil(t, pool.pool, "expected pool to be initialized")
-
-	assert.NotNil(t, pool.closeChannel, "expected closeChannel to be initialized")
-
+func DialTest(address string, options ...grpc.DialOption) (*grpc.ClientConn, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), DialTimeout)
+	defer cancel()
+	return grpc.DialContext(ctx, address, grpc.WithInsecure())
 }
 
-// TestConnPool_GetConnection tests getting a connection from the pool
-func TestConnPool_GetConnection(t *testing.T) {
-	dialer := func(address string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
-		if len(opts) == 0 {
-			opts = append(opts, grpc.WithInsecure()) // 这里加上 WithInsecure 选项
-		}
-		conn, err := grpc.Dial(address, opts...)
-		if err != nil {
-			return nil, err
-		}
-		return conn, nil
+func TestConnPoolInitialization(t *testing.T) {
+	options := Options{
+		// 设定为一个有效的 Dial 函数
+		Dial:        DialTest,
+		MaxIdle:     5,
+		MaxActive:   10,
+		IdleTimeout: 5 * time.Second,
 	}
 
-	pool := NewConnPool(2, "localhost:50051", dialer)
+	pool, err := NewConnPool("localhost:8080", options)
+	assert.NoError(t, err)
+	assert.NotNil(t, pool)
+	assert.Equal(t, int32(0), pool.currentSize)
+	assert.Equal(t, int32(5), pool.maxPoolSize)
 
-	conn, err := pool.GetConnection()
-	assert.NoError(t, err, "expected no error when getting a connection")
+	assert.NotNil(t, pool.healthCheck)
 
-	assert.NotNil(t, conn, "expected a non-nil connection")
+	err = pool.Close()
+	if err != nil {
+		t.Fatalf("Failed to close connection pool: %v", err)
+	}
 }
 
-// TestConnPool_isHealthy tests the isHealthy method of the pool
-func TestConnPool_isHealthy(t *testing.T) {
-	dialer := func(address string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
-		if len(opts) == 0 {
-			opts = append(opts, grpc.WithInsecure()) // 这里加上 WithInsecure 选项
-		}
-		conn, err := grpc.Dial(address, opts...)
-		if err != nil {
-			return nil, err
-		}
-		return conn, nil
+func TestGetConnection(t *testing.T) {
+	options := Options{
+		Dial:        DialTest,
+		MaxIdle:     2,
+		MaxActive:   5,
+		IdleTimeout: 2 * time.Second,
 	}
 
-	pool := NewConnPool(2, "localhost:50051", dialer)
+	pool, err := NewConnPool("localhost:8080", options)
+	assert.NoError(t, err)
 
-	conn, _ := pool.GetConnection()
+	conn, err := pool.Get()
+	assert.NoError(t, err)
+	assert.NotNil(t, conn)
 
-	assert.True(t, pool.isHealthy(conn), "expected the connection to be healthy")
+	conn2, err := pool.Get()
+	assert.NoError(t, err)
+	assert.NotNil(t, conn2)
+
+	conn3, err := pool.Get()
+	assert.NoError(t, err)
+	assert.NotNil(t, conn3)
+
+	fmt.Printf("pool,status：%v\n\n", pool.Status())
+
+	err = pool.Close()
+	if err != nil {
+		t.Fatalf("Failed to close connection pool: %v", err)
+	}
 }
 
-// TestConnPool_cleanUp tests the cleanUp function for cleaning idle or unhealthy connections
-func TestConnPool_cleanUp(t *testing.T) {
-	dialer := func(address string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
-		if len(opts) == 0 {
-			opts = append(opts, grpc.WithInsecure()) // 这里加上 WithInsecure 选项
-		}
-		conn, err := grpc.Dial(address, opts...)
-		if err != nil {
-			return nil, err
-		}
-		return conn, nil
+func TestPutConnection(t *testing.T) {
+	options := Options{
+		Dial:        DialTest,
+		MaxIdle:     2,
+		MaxActive:   5,
+		IdleTimeout: 2 * time.Second,
 	}
 
-	pool := NewConnPool(2, "localhost:50051", dialer)
+	pool, err := NewConnPool("localhost:8080", options)
+	assert.NoError(t, err)
 
-	conn, _ := pool.GetConnection()
-	conn.lastUsed = time.Now().Add(-10 * time.Minute)
+	conn, err := pool.Get()
+	assert.NoError(t, err)
+	pool.Put(conn)
 
-	go pool.cleanUp()
+	conn2, err := pool.Get()
+	assert.NoError(t, err)
+	pool.Put(conn2)
 
-	time.Sleep(2 * time.Second)
+	conn3, err := pool.Get()
+	assert.NoError(t, err)
+	pool.Put(conn3)
 
-	assert.Len(t, pool.pool, 1, "expected 1 connection after cleanup")
+	assert.Len(t, pool.pool, 2)
+
+	err = pool.Close()
+	if err != nil {
+		t.Fatalf("Failed to close connection pool: %v", err)
+	}
 }
 
-// TestConnPool_DynamicResize tests the DynamicResize method
-func TestConnPool_DynamicResize(t *testing.T) {
-	dialer := func(address string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
-		if len(opts) == 0 {
-			opts = append(opts, grpc.WithInsecure()) // 这里加上 WithInsecure 选项
-		}
-		conn, err := grpc.Dial(address, opts...)
-		if err != nil {
-			return nil, err
-		}
-		return conn, nil
+func TestHealthCheck(t *testing.T) {
+	options := Options{
+		Dial:        DialTest,
+		MaxIdle:     2,
+		MaxActive:   5,
+		IdleTimeout: 2 * time.Second,
 	}
 
-	pool := NewConnPool(2, "localhost:50051", dialer)
+	pool, err := NewConnPool("localhost:8080", options)
+	assert.NoError(t, err)
 
-	initialSize := pool.maxPoolSize
+	time.Sleep(3 * time.Second)
 
-	pool.DynamicResize()
+	assert.Len(t, pool.pool, 0)
 
-	assert.Equal(t, initialSize+1, pool.maxPoolSize, "expected pool size to increase by 1")
+	err = pool.Close()
+	if err != nil {
+		t.Fatalf("Failed to close connection pool: %v", err)
+	}
 }
 
-// TestConnPool_Close tests the Close method
-func TestConnPool_Close(t *testing.T) {
-	dialer := func(address string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
-		if len(opts) == 0 {
-			opts = append(opts, grpc.WithInsecure()) // 这里加上 WithInsecure 选项
-		}
-		conn, err := grpc.Dial(address, opts...)
-		if err != nil {
-			return nil, err
-		}
-		return conn, nil
+func TestDynamicResize(t *testing.T) {
+	options := Options{
+		Dial:        DialTest,
+		MaxIdle:     2,
+		MaxActive:   10,
+		IdleTimeout: 2 * time.Second,
 	}
 
-	pool := NewConnPool(2, "localhost:50051", dialer)
+	pool, err := NewConnPool("localhost:8080", options)
+	assert.NoError(t, err)
 
-	err := pool.Close()
-	assert.NoError(t, err, "expected no error when closing the pool")
+	assert.Equal(t, int32(2), pool.maxPoolSize)
 
-	assert.Empty(t, pool.pool, "expected no connections in pool after close")
-	assert.Equal(t, 0, pool.currentSize, "expected current size to be 0 after close")
+	var wg sync.WaitGroup
+
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+
+		go func(i int) {
+			defer wg.Done()
+
+			// 获取连接
+			conn, err := pool.Get()
+			assert.NoError(t, err)
+
+			time.Sleep(100 * time.Millisecond)
+
+			pool.Put(conn)
+
+			if i >= 2 {
+				assert.Greater(t, pool.maxPoolSize, int32(2))
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	assert.Equal(t, int32(10), pool.maxPoolSize)
+
+	err = pool.Close()
+	if err != nil {
+		t.Fatalf("Failed to close connection pool: %v", err)
+	}
+}
+
+func TestClosePool(t *testing.T) {
+	options := Options{
+		Dial:        DialTest,
+		MaxIdle:     2,
+		MaxActive:   5,
+		IdleTimeout: 2 * time.Second,
+	}
+
+	pool, err := NewConnPool("localhost:8080", options)
+	assert.NoError(t, err)
+
+	conn, err := pool.Get()
+	assert.NoError(t, err)
+	pool.Put(conn)
+
+	err = pool.Close()
+	assert.NoError(t, err)
+
+	conn2, err := pool.Get()
+	assert.Error(t, err)
+	assert.Nil(t, conn2)
+}
+
+func TestConnPoolShrinkPool(t *testing.T) {
+	options := Options{
+		Dial:        DialTest,
+		MaxIdle:     5,
+		MaxActive:   10,
+		IdleTimeout: 5 * time.Second,
+	}
+
+	pool, err := NewConnPool("localhost:8080", options)
+	assert.NoError(t, err)
+	assert.NotNil(t, pool)
+
+	// mock
+	atomic.StoreInt32(&pool.currentSize, 6)
+	pool.pool = make([]*TripleConn, 12)
+	atomic.StoreInt32(&pool.maxPoolSize, 12)
+
+	pool.ShrinkPool()
+
+	assert.Equal(t, int32(11), atomic.LoadInt32(&pool.maxPoolSize))
+	assert.Equal(t, 8, pool.opt.MaxIdle)
+
 }
