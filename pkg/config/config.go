@@ -71,9 +71,6 @@ type Option struct {
 	TLSCertFile   string
 	TLSKeyFile    string
 	TLSServerName string
-
-	PoolSize    int
-	IdleTimeout time.Duration
 }
 
 // Validate sets empty field to default config
@@ -105,7 +102,6 @@ func (o *Option) Validate() {
 	if o.NumWorkers <= 0 {
 		o.NumWorkers = constant.DefaultNumWorkers
 	}
-
 }
 
 // nolint
@@ -238,19 +234,5 @@ func WithJaegerConfig(address, serviceName string, useAgent bool) OptionFunction
 func WithProxyModeEnable(enable bool) OptionFunction {
 	return func(o *Option) {
 		o.ProxyModeEnable = enable
-	}
-}
-
-// WithPoolSize return OptionFunction with pool size of @size
-func WithPoolSize(size int) OptionFunction {
-	return func(o *Option) {
-		o.PoolSize = size
-	}
-}
-
-// WithIdleTimeout return OptionFunction with idle timeout of @timeout
-func WithIdleTimeout(timeout time.Duration) OptionFunction {
-	return func(o *Option) {
-		o.IdleTimeout = timeout
 	}
 }

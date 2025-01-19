@@ -83,7 +83,3 @@ func getInvoker(impl interface{}, conn *TripleConn) interface{} {
 	// it's SayHello methodwill call specific of conn's invoker.
 	return res[0].Interface()
 }
-
-//func (t *TripleConn) GetStatus() connectivity.State {
-//	return t.status
-//}
