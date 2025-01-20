@@ -131,8 +131,8 @@ func TestDynamicResize(t *testing.T) {
 		IdleTimeout: 2 * time.Second,
 	}
 
-	pool, err := NewConnPool("localhost:8080", options)
-	assert.NoError(t, err)
+	pool, connErr := NewConnPool("localhost:8080", options)
+	assert.NoError(t, connErr)
 
 	assert.Equal(t, int32(2), pool.maxPoolSize)
 
@@ -161,9 +161,9 @@ func TestDynamicResize(t *testing.T) {
 	wg.Wait()
 	assert.Equal(t, int32(10), pool.maxPoolSize)
 
-	err = pool.Close()
-	if err != nil {
-		t.Fatalf("Failed to close connection pool: %v", err)
+	closeErr := pool.Close()
+	if closeErr != nil {
+		t.Fatalf("Failed to close connection pool: %v", closeErr)
 	}
 }
 

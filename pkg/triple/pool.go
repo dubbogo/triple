@@ -290,7 +290,7 @@ func (cp *ConnPool) deleteFrom(maxSize int32) {
 		conn := cp.pool[i]
 		if conn != nil {
 			if closeErr := conn.grpcConn.Close(); closeErr != nil {
-				fmt.Errorf("error closing connection: %v", closeErr)
+				log.Printf("error closing connection: %v", closeErr)
 				return
 			}
 			cp.pool = cp.pool[:i]
