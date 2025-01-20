@@ -143,8 +143,7 @@ func TestDynamicResize(t *testing.T) {
 
 		go func(i int) {
 			defer wg.Done()
-
-			// 获取连接
+			
 			conn, err := pool.Get()
 			assert.NoError(t, err)
 
