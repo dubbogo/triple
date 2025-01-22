@@ -2,6 +2,7 @@ package triple
 
 import (
 	"fmt"
+	"github.com/dubbogo/triple/pkg/common/constant"
 	"github.com/pkg/errors"
 	"log"
 	"sync"
@@ -88,7 +89,7 @@ func (cp *ConnPool) Get() (*TripleConn, error) {
 	}
 
 	if atomic.LoadInt32(&cp.currentSize) < int32(cp.opt.MaxActive) {
-		cp.DynamicResize()
+		cp.DynamicResize(constant.ResizeTypeIncrease)
 	}
 
 	if len(cp.pool) > 0 {
@@ -172,81 +173,87 @@ func (cp *ConnPool) cleanUpAndHealthCheck() {
 				}
 			}
 
-			cp.ShrinkPool()
+			cp.DynamicResize(constant.ResizeTypeDecrease)
 
 			cp.mu.Unlock()
 		}
 	}
 }
 
-// DynamicResize performs dynamic resizing of the connection pool
-func (cp *ConnPool) DynamicResize() {
-	if atomic.LoadInt32(&cp.currentSize) >= int32(cp.opt.MaxActive) {
-		return
-	}
+// DynamicResize performs dynamic resizing of the connection pool, either resizing up or down.
+func (cp *ConnPool) DynamicResize(resizeType int) {
+	currentSize := atomic.LoadInt32(&cp.currentSize)
+	maxActive := int32(cp.opt.MaxActive)
+	maxIdle := int32(cp.opt.MaxIdle)
 
-	increase := int32(1 << atomic.LoadInt32(&cp.resizeCount))
-	if increase > int32(cp.opt.MaxIdle) {
-		increase = int32(cp.opt.MaxIdle)
-	}
-
-	newMaxPoolSize := atomic.AddInt32(&cp.maxPoolSize, increase)
-
-	newMaxIdle := int32(float64(newMaxPoolSize) * 0.8)
-	if newMaxIdle > int32(cp.opt.MaxActive) {
-		newMaxIdle = int32(cp.opt.MaxActive)
-	}
-
-	cp.opt.MaxIdle = int(newMaxIdle)
-	if newMaxPoolSize > int32(cp.opt.MaxActive) {
-		atomic.StoreInt32(&cp.maxPoolSize, int32(cp.opt.MaxActive))
-	}
-
-	for i := int32(0); i < increase && atomic.LoadInt32(&cp.currentSize) < atomic.LoadInt32(&cp.maxPoolSize); i++ {
-		conn, err := cp.opt.Dial(cp.address)
-		if err != nil {
-			continue
+	if resizeType == constant.ResizeTypeIncrease {
+		if currentSize >= maxActive {
+			return
 		}
 
-		newConn := &TripleConn{
-			timeout:      DialTimeout,
-			grpcConn:     conn,
-			LastUsedTime: time.Now(),
-		}
-		cp.pool = append(cp.pool, newConn)
-	}
-
-	atomic.AddInt32(&cp.resizeCount, 1)
-	log.Printf("Resized connection pool, new max pool size: %d", atomic.LoadInt32(&cp.maxPoolSize))
-}
-
-// ShrinkPool performs shrinking of the connection pool by reducing idle connections
-func (cp *ConnPool) ShrinkPool() {
-	idealSize := int32(float64(cp.opt.MaxActive) * 0.8)
-
-	if atomic.LoadInt32(&cp.currentSize) < idealSize && len(cp.pool) > int(idealSize) {
-		decrease := int32(1 << atomic.LoadInt32(&cp.resizeCount))
-
-		if decrease > int32(cp.opt.MaxIdle) {
-			decrease = int32(cp.opt.MaxIdle)
+		increase := int32(1 << atomic.LoadInt32(&cp.resizeCount))
+		if increase > maxIdle {
+			increase = maxIdle
 		}
 
-		newMaxPoolSize := atomic.LoadInt32(&cp.maxPoolSize) - decrease
-		if newMaxPoolSize < int32(cp.opt.MaxIdle) {
-			newMaxPoolSize = int32(cp.opt.MaxIdle)
-		}
+		newMaxPoolSize := atomic.AddInt32(&cp.maxPoolSize, increase)
 
-		atomic.StoreInt32(&cp.maxPoolSize, newMaxPoolSize)
-
+		// 更新 MaxIdle
 		newMaxIdle := int32(float64(newMaxPoolSize) * 0.8)
-		if newMaxIdle < int32(cp.opt.MaxIdle) {
-			newMaxIdle = int32(cp.opt.MaxIdle)
+		if newMaxIdle > maxActive {
+			newMaxIdle = maxActive
 		}
 		cp.opt.MaxIdle = int(newMaxIdle)
 
-		cp.deleteFrom(newMaxPoolSize)
+		if newMaxPoolSize > maxActive {
+			atomic.StoreInt32(&cp.maxPoolSize, maxActive)
+		}
 
-		log.Printf("Shrunk connection pool, new max pool size: %d", atomic.LoadInt32(&cp.maxPoolSize))
+		for i := int32(0); i < increase && atomic.LoadInt32(&cp.currentSize) < atomic.LoadInt32(&cp.maxPoolSize); i++ {
+			conn, err := cp.opt.Dial(cp.address)
+			if err != nil {
+				continue
+			}
+
+			newConn := &TripleConn{
+				timeout:      DialTimeout,
+				grpcConn:     conn,
+				LastUsedTime: time.Now(),
+			}
+			cp.pool = append(cp.pool, newConn)
+		}
+
+		atomic.AddInt32(&cp.resizeCount, 1)
+		log.Printf("Resized connection pool, new max pool size: %d", atomic.LoadInt32(&cp.maxPoolSize))
+	}
+
+	if resizeType == constant.ResizeTypeDecrease {
+		idealSize := int32(float64(maxActive) * 0.8)
+
+		if currentSize < idealSize && len(cp.pool) > int(idealSize) {
+			decrease := int32(1 << atomic.LoadInt32(&cp.resizeCount))
+
+			if decrease > maxIdle {
+				decrease = maxIdle
+			}
+
+			newMaxPoolSize := atomic.LoadInt32(&cp.maxPoolSize) - decrease
+			if newMaxPoolSize < maxIdle {
+				newMaxPoolSize = maxIdle
+			}
+
+			atomic.StoreInt32(&cp.maxPoolSize, newMaxPoolSize)
+
+			newMaxIdle := int32(float64(newMaxPoolSize) * 0.8)
+			if newMaxIdle < maxIdle {
+				newMaxIdle = maxIdle
+			}
+			cp.opt.MaxIdle = int(newMaxIdle)
+
+			cp.deleteFrom(newMaxPoolSize)
+
+			log.Printf("Shrunk connection pool, new max pool size: %d", atomic.LoadInt32(&cp.maxPoolSize))
+		}
 	}
 }
 

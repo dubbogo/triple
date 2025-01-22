@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/dubbogo/grpc-go"
+	"github.com/dubbogo/triple/pkg/common/constant"
 	"github.com/stretchr/testify/assert"
 	"sync"
 	"sync/atomic"
@@ -203,7 +204,7 @@ func TestConnPoolShrinkPool(t *testing.T) {
 	pool.pool = make([]*TripleConn, 12)
 	atomic.StoreInt32(&pool.maxPoolSize, 12)
 
-	pool.ShrinkPool()
+	pool.DynamicResize(constant.ResizeTypeDecrease)
 
 	assert.Equal(t, int32(11), atomic.LoadInt32(&pool.maxPoolSize))
 	assert.Equal(t, 8, pool.opt.MaxIdle)
