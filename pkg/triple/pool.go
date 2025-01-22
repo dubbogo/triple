@@ -152,7 +152,7 @@ func (cp *ConnPool) isHealthy(conn *TripleConn) bool {
 
 // cleanUpAndHealthCheck performs both health checks and cleans up expired or unhealthy connections
 func (cp *ConnPool) cleanUpAndHealthCheck() {
-	ticker := time.NewTicker(100 * time.Millisecond) // 适当选择合适的清理频率
+	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
