@@ -266,10 +266,6 @@ func (cp *ConnPool) deleteFrom(maxSize int32) {
 
 // Close shuts down the connection pool and closes all connections
 func (cp *ConnPool) Close() error {
-	if cp.closeChannel == nil {
-		return nil
-	}
-
 	close(cp.closeChannel)
 
 	cp.mu.Lock()
