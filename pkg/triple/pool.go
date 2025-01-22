@@ -186,7 +186,8 @@ func (cp *ConnPool) DynamicResize(resizeType int) {
 	maxActive := int32(cp.opt.MaxActive)
 	maxIdle := int32(cp.opt.MaxIdle)
 
-	if resizeType == constant.ResizeTypeIncrease {
+	switch resizeType {
+	case constant.ResizeTypeIncrease:
 		if currentSize >= maxActive {
 			return
 		}
@@ -198,7 +199,6 @@ func (cp *ConnPool) DynamicResize(resizeType int) {
 
 		newMaxPoolSize := atomic.AddInt32(&cp.maxPoolSize, increase)
 
-		// 更新 MaxIdle
 		newMaxIdle := int32(float64(newMaxPoolSize) * 0.8)
 		if newMaxIdle > maxActive {
 			newMaxIdle = maxActive
@@ -225,9 +225,8 @@ func (cp *ConnPool) DynamicResize(resizeType int) {
 
 		atomic.AddInt32(&cp.resizeCount, 1)
 		log.Printf("Resized connection pool, new max pool size: %d", atomic.LoadInt32(&cp.maxPoolSize))
-	}
 
-	if resizeType == constant.ResizeTypeDecrease {
+	case constant.ResizeTypeDecrease:
 		idealSize := int32(float64(maxActive) * 0.8)
 
 		if currentSize < idealSize && len(cp.pool) > int(idealSize) {
@@ -254,6 +253,9 @@ func (cp *ConnPool) DynamicResize(resizeType int) {
 
 			log.Printf("Shrunk connection pool, new max pool size: %d", atomic.LoadInt32(&cp.maxPoolSize))
 		}
+
+	default:
+		log.Printf("Unknown resize type: %d", resizeType)
 	}
 }
 
