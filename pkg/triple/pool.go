@@ -10,18 +10,16 @@ import (
 )
 import (
 	"github.com/dubbogo/grpc-go/connectivity"
-	"github.com/go-co-op/gocron"
 )
 
 // ConnPool manages a pool of TripleConn instances
 type ConnPool struct {
 	pool []*TripleConn
-	mu   sync.Mutex
+	mu   sync.RWMutex
 
 	currentSize  int32
 	closeChannel chan struct{}
 	opt          Options
-	healthCheck  *gocron.Scheduler
 	address      string
 	maxPoolSize  int32
 	resizeCount  int32
@@ -40,11 +38,10 @@ func NewConnPool(address string, option Options) (*ConnPool, error) {
 	}
 
 	pool := &ConnPool{
-		mu:           sync.Mutex{},
+		mu:           sync.RWMutex{},
 		currentSize:  0,
 		closeChannel: make(chan struct{}),
 		opt:          option,
-		healthCheck:  gocron.NewScheduler(time.UTC),
 		address:      address,
 		pool:         make([]*TripleConn, 0, option.MaxIdle),
 		maxPoolSize:  int32(option.MaxIdle),
@@ -67,8 +64,7 @@ func NewConnPool(address string, option Options) (*ConnPool, error) {
 
 	log.Printf("new pool success: %v\n", pool.Status())
 
-	go pool.startHealthCheck()
-	go pool.cleanUp()
+	go pool.cleanUpAndHealthCheck()
 
 	return pool, nil
 }
@@ -142,7 +138,8 @@ func (cp *ConnPool) Put(conn *TripleConn) {
 
 // isHealthy checks if the connection is healthy based on its state and last used time.
 func (cp *ConnPool) isHealthy(conn *TripleConn) bool {
-	if conn.grpcConn.GetState() == connectivity.Shutdown {
+	state := conn.grpcConn.GetState()
+	if state == connectivity.Shutdown || state == connectivity.TransientFailure {
 		return false
 	}
 
@@ -153,10 +150,9 @@ func (cp *ConnPool) isHealthy(conn *TripleConn) bool {
 	return true
 }
 
-// cleanUp periodically cleans up idle or unhealthy connections
-func (cp *ConnPool) cleanUp() {
-	ticker := time.NewTicker(100 * time.Millisecond)
-
+// cleanUpAndHealthCheck performs both health checks and cleans up expired or unhealthy connections
+func (cp *ConnPool) cleanUpAndHealthCheck() {
+	ticker := time.NewTicker(100 * time.Millisecond) // 适当选择合适的清理频率
 	defer ticker.Stop()
 
 	for {
@@ -166,51 +162,21 @@ func (cp *ConnPool) cleanUp() {
 		case <-ticker.C:
 			cp.mu.Lock()
 
+			now := time.Now()
 			for i := len(cp.pool) - 1; i >= 0; i-- {
 				conn := cp.pool[i]
-				if !cp.isHealthy(conn) || time.Since(conn.LastUsedTime) > cp.opt.IdleTimeout {
+				if !cp.isHealthy(conn) || now.Sub(conn.LastUsedTime) > cp.opt.IdleTimeout {
 					conn.grpcConn.Close()
 					cp.pool = append(cp.pool[:i], cp.pool[i+1:]...)
 					atomic.AddInt32(&cp.currentSize, -1)
 				}
 			}
 
+			cp.ShrinkPool()
+
 			cp.mu.Unlock()
 		}
 	}
-}
-
-// startHealthCheck performs periodic health checks
-func (cp *ConnPool) startHealthCheck() {
-	cp.healthCheck = gocron.NewScheduler(time.UTC)
-	_, err := cp.healthCheck.Every(30).Seconds().Do(func() {
-		cp.cleanupExpiredConnections()
-	})
-	if err != nil {
-		fmt.Printf("Error starting health check: %s\n", err)
-	}
-	cp.healthCheck.StartAsync()
-}
-
-// cleanupExpiredConnections Check and clean up expired connections
-func (cp *ConnPool) cleanupExpiredConnections() {
-	cp.mu.Lock()
-	defer cp.mu.Unlock()
-
-	now := time.Now()
-
-	for i := len(cp.pool) - 1; i >= 0; i-- {
-		conn := cp.pool[i]
-		if now.Sub(conn.LastUsedTime) > cp.opt.IdleTimeout {
-			conn.grpcConn.Close()
-			cp.pool = append(cp.pool[:i], cp.pool[i+1:]...)
-			atomic.AddInt32(&cp.currentSize, -1)
-		}
-	}
-
-	cp.ShrinkPool()
-
-	log.Printf("cleanupExpiredConnections: current pool size: %d\n", len(cp.pool))
 }
 
 // DynamicResize performs dynamic resizing of the connection pool
@@ -324,28 +290,6 @@ func (cp *ConnPool) Close() error {
 	}
 
 	return nil
-}
-
-func (p *ConnPool) incrPoolSize() int32 {
-	newSize := atomic.AddInt32(&p.currentSize, 1)
-	return newSize
-}
-
-func (p *ConnPool) decrPoolSize() int32 {
-	newSize := atomic.AddInt32(&p.currentSize, -1)
-	return newSize
-}
-
-func (p *ConnPool) setMaxPoolSize(size int32) {
-	atomic.StoreInt32(&p.maxPoolSize, size)
-}
-
-func (p *ConnPool) getPoolSize() int32 {
-	return atomic.LoadInt32(&p.currentSize)
-}
-
-func (p *ConnPool) getMaxPoolSize() int32 {
-	return atomic.LoadInt32(&p.maxPoolSize)
 }
 
 func (p *ConnPool) Status() string {

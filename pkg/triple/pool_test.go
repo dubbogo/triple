@@ -19,7 +19,6 @@ func DialTest(address string, options ...grpc.DialOption) (*grpc.ClientConn, err
 
 func TestConnPoolInitialization(t *testing.T) {
 	options := Options{
-		// 设定为一个有效的 Dial 函数
 		Dial:        DialTest,
 		MaxIdle:     5,
 		MaxActive:   10,
@@ -31,8 +30,6 @@ func TestConnPoolInitialization(t *testing.T) {
 	assert.NotNil(t, pool)
 	assert.Equal(t, int32(0), pool.currentSize)
 	assert.Equal(t, int32(5), pool.maxPoolSize)
-
-	assert.NotNil(t, pool.healthCheck)
 
 	err = pool.Close()
 	if err != nil {
@@ -63,7 +60,7 @@ func TestGetConnection(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, conn3)
 
-	fmt.Printf("pool,status：%v\n\n", pool.Status())
+	fmt.Printf("pool,status：%v\n", pool.Status())
 
 	err = pool.Close()
 	if err != nil {
@@ -143,7 +140,7 @@ func TestDynamicResize(t *testing.T) {
 
 		go func(i int) {
 			defer wg.Done()
-			
+
 			conn, err := pool.Get()
 			assert.NoError(t, err)
 
