@@ -3,13 +3,19 @@ package triple
 import (
 	"context"
 	"fmt"
-	"github.com/dubbogo/grpc-go"
-	"github.com/dubbogo/triple/pkg/common/constant"
-	"github.com/stretchr/testify/assert"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+)
+
+import (
+	"github.com/dubbogo/grpc-go"
+	"github.com/stretchr/testify/assert"
+)
+
+import (
+	"github.com/dubbogo/triple/pkg/common/constant"
 )
 
 func DialTest(address string, options ...grpc.DialOption) (*grpc.ClientConn, error) {

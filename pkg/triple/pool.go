@@ -2,15 +2,19 @@ package triple
 
 import (
 	"fmt"
-	"github.com/dubbogo/triple/pkg/common/constant"
-	"github.com/pkg/errors"
 	"log"
 	"sync"
 	"sync/atomic"
 	"time"
 )
+
 import (
 	"github.com/dubbogo/grpc-go/connectivity"
+	"github.com/pkg/errors"
+)
+
+import (
+	"github.com/dubbogo/triple/pkg/common/constant"
 )
 
 // ConnPool manages a pool of TripleConn instances
