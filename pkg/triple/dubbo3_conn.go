@@ -34,8 +34,9 @@ import (
 // TripleConn is the struct that called in pb.go file
 // Its client field contains all net logic of dubbo3
 type TripleConn struct {
-	timeout  time.Duration
-	grpcConn *grpc.ClientConn
+	timeout      time.Duration
+	grpcConn     *grpc.ClientConn
+	LastUsedTime time.Time
 }
 
 // Invoke called by unary rpc 's pb.go file in dubbo-go 3.0 design

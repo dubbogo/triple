@@ -110,3 +110,9 @@ const (
 const (
 	ProxyServiceKey = "github.com.dubbogo.triple.proxy"
 )
+
+// DynamicResize performs dynamic resizing of the connection pool
+const (
+	ResizeTypeIncrease = iota
+	ResizeTypeDecrease
+)
