@@ -282,28 +282,21 @@ func (t *TripleServer) Start() {
 
 func (t *TripleServer) RefreshService() {
 	t.opt.Logger.Debugf("TripleServer.Refresh: call refresh services")
-	grpcServer := newGrpcServerWithCodec(t.opt)
 	t.rpcServiceMap.Range(func(key, value interface{}) bool {
 		grpcService, ok := value.(common.TripleGrpcService)
 		if ok {
 			desc := grpcService.XXX_ServiceDesc()
 			desc.ServiceName = key.(string)
-			grpcServer.RegisterService(desc, value)
+			t.grpcServer.RegisterService(desc, value)
 		} else {
 			desc := createGrpcDesc(key.(string), value.(common.TripleUnaryService))
-			grpcServer.RegisterService(desc, value)
+			t.grpcServer.RegisterService(desc, value)
 		}
 		if key == "grpc.reflection.v1alpha.ServerReflection" {
-			grpcService.(common.TripleGrpcReflectService).SetGRPCServer(grpcServer)
+			grpcService.(common.TripleGrpcReflectService).SetGRPCServer(t.grpcServer)
 		}
 		return true
 	})
-	t.grpcServer.Stop()
-	t.lst.Close()
-	lst, _ := net.Listen("tcp", t.opt.Location)
-	go grpcServer.Serve(lst)
-	t.grpcServer = grpcServer
-	t.lst = lst
 }
 
 func getServerTlsCertificate(opt *config.Option) (credentials.TransportCredentials, error) {
